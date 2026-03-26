@@ -45,10 +45,10 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={<GraduationCap size={22} className="text-primary-foreground" />} label="Total Students" value={String(totalStudents)} change="+12 this term" color="gradient-primary" />
-        <StatCard icon={<Users size={22} className="text-success-foreground" />} label="Total Staff" value={String(totalStaff)} change={`${teachers} teachers`} color="bg-success" />
-        <StatCard icon={<DollarSign size={22} className="text-warning-foreground" />} label="Fees Outstanding" value={`$${totalFees.toLocaleString()}`} color="bg-warning" />
-        <StatCard icon={<TrendingUp size={22} className="text-info-foreground" />} label="Total Revenue" value={`$${totalRevenue.toLocaleString()}`} change="+8% vs last term" color="bg-info" />
+        <StatCard icon={<GraduationCap size={22} className="text-primary-foreground" />} label="Total Students" value={String(totalStudents)} change="+12 this term" color="gradient-primary" cardAccent="light-card-blue" />
+        <StatCard icon={<Users size={22} className="text-success-foreground" />} label="Total Staff" value={String(totalStaff)} change={`${teachers} teachers`} color="bg-success" cardAccent="light-card-green" />
+        <StatCard icon={<DollarSign size={22} className="text-warning-foreground" />} label="Fees Outstanding" value={`$${totalFees.toLocaleString()}`} color="bg-warning" cardAccent="light-card-orange" />
+        <StatCard icon={<TrendingUp size={22} className="text-info-foreground" />} label="Total Revenue" value={`$${totalRevenue.toLocaleString()}`} change="+8% vs last term" color="bg-info" cardAccent="light-card-cyan" />
       </div>
 
       {/* Charts Row */}
