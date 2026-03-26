@@ -6,9 +6,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 const COLORS = ['hsl(217,91%,50%)', 'hsl(142,71%,45%)', 'hsl(38,92%,50%)', 'hsl(280,67%,52%)'];
 
-function StatCard({ icon, label, value, change, color }: { icon: React.ReactNode; label: string; value: string; change?: string; color: string }) {
+function StatCard({ icon, label, value, change, color, cardAccent }: { icon: React.ReactNode; label: string; value: string; change?: string; color: string; cardAccent?: string }) {
   return (
-    <div className="bg-card rounded-xl p-5 shadow-card hover:shadow-card-hover transition-shadow animate-fade-in">
+    <div className={`bg-card rounded-xl p-5 shadow-card hover:shadow-card-hover transition-shadow animate-fade-in ${cardAccent || ''}`}>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm text-muted-foreground">{label}</p>
