@@ -14,6 +14,9 @@ import EnrollStudent from "@/pages/EnrollStudent";
 import GeneralLedger from "@/pages/finance/GeneralLedger";
 import Cashbook from "@/pages/finance/Cashbook";
 import Journals from "@/pages/finance/Journals";
+import Invoices from "@/pages/finance/Invoices";
+import Receipts from "@/pages/finance/Receipts";
+import CurrencySettings from "@/pages/finance/CurrencySettings";
 import TrialBalance from "@/pages/reports/TrialBalance";
 import BalanceSheet from "@/pages/reports/BalanceSheet";
 import IncomeStatement from "@/pages/reports/IncomeStatement";
@@ -60,8 +63,9 @@ const App = () => (
                 <Route path="/finance/gl" element={<GeneralLedger />} />
                 <Route path="/finance/cashbook" element={<Cashbook />} />
                 <Route path="/finance/journals" element={<Journals />} />
-                <Route path="/finance/invoices" element={<PlaceholderPage />} />
-                <Route path="/finance/receipts" element={<PlaceholderPage />} />
+                <Route path="/finance/invoices" element={<Invoices />} />
+                <Route path="/finance/receipts" element={<Receipts />} />
+                <Route path="/finance/currency" element={<CurrencySettings />} />
                 <Route path="/finance/creditors" element={<PlaceholderPage />} />
                 <Route path="/finance/bank-recon" element={<PlaceholderPage />} />
                 <Route path="/reports/trial-balance" element={<TrialBalance />} />
