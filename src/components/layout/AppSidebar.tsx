@@ -53,6 +53,7 @@ const navItems: NavItem[] = [
       { label: 'Journals', path: '/finance/journals' },
       { label: 'Invoices', path: '/finance/invoices' },
       { label: 'Receipts', path: '/finance/receipts' },
+      { label: 'Currency & Payments', path: '/finance/currency' },
       { label: 'Creditors', path: '/finance/creditors' },
       { label: 'Bank Reconciliation', path: '/finance/bank-recon' },
     ]

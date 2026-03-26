@@ -63,8 +63,9 @@ const App = () => (
                 <Route path="/finance/gl" element={<GeneralLedger />} />
                 <Route path="/finance/cashbook" element={<Cashbook />} />
                 <Route path="/finance/journals" element={<Journals />} />
-                <Route path="/finance/invoices" element={<PlaceholderPage />} />
-                <Route path="/finance/receipts" element={<PlaceholderPage />} />
+                <Route path="/finance/invoices" element={<Invoices />} />
+                <Route path="/finance/receipts" element={<Receipts />} />
+                <Route path="/finance/currency" element={<CurrencySettings />} />
                 <Route path="/finance/creditors" element={<PlaceholderPage />} />
                 <Route path="/finance/bank-recon" element={<PlaceholderPage />} />
                 <Route path="/reports/trial-balance" element={<TrialBalance />} />
