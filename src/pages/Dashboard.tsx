@@ -24,6 +24,7 @@ function StatCard({ icon, label, value, change, color, cardAccent }: { icon: Rea
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { currentBranch } = useBranch();
   const totalStudents = students.length;
   const boardingStudents = students.filter(s => s.boardingStatus === 'Boarding').length;
   const dayStudents = students.filter(s => s.boardingStatus === 'Day').length;
