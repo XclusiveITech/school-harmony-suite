@@ -42,7 +42,9 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl font-bold text-foreground">Welcome back, {user?.name?.split(' ')[0]}!</h1>
-        <p className="text-muted-foreground text-sm mt-1">Here's what's happening at Brainstar today</p>
+        <p className="text-muted-foreground text-sm mt-1">
+          {currentBranch.name} — Here's what's happening today
+        </p>
       </div>
 
       {/* Stats Grid */}
