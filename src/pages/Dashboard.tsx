@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { students, staff, announcements, revenueData, attendanceData } from '@/lib/dummy-data';
+import { useBranch } from '@/contexts/BranchContext';
 import { Users, GraduationCap, DollarSign, TrendingUp, BookOpen, AlertCircle, UserCheck, Building2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
