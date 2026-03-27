@@ -94,6 +94,7 @@ const App = () => (
         </TooltipProvider>
       </AuthProvider>
       </BranchProvider>
+      </SchoolSettingsProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
