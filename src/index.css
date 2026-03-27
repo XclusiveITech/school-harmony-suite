@@ -157,6 +157,10 @@
     border-left: 4px solid hsl(38 92% 50%);
     box-shadow: 0 2px 8px 0 hsl(38 92% 50% / 0.08), 0 1px 3px -1px hsl(38 92% 50% / 0.06);
   }
+  :root .light-card-red {
+    border-left: 4px solid hsl(0 72% 51%);
+    box-shadow: 0 2px 8px 0 hsl(0 72% 51% / 0.08), 0 1px 3px -1px hsl(0 72% 51% / 0.06);
+  }
   :root .light-card-purple {
     border-left: 4px solid hsl(280 67% 52%);
     box-shadow: 0 2px 8px 0 hsl(280 67% 52% / 0.08), 0 1px 3px -1px hsl(280 67% 52% / 0.06);
