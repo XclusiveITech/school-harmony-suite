@@ -1,21 +1,41 @@
-import React from 'react';
-import { glAccounts, transactions } from '@/lib/dummy-data';
-import { Search, Download, Filter } from 'lucide-react';
+import React, { useState } from 'react';
+import { glAccounts } from '@/lib/dummy-data';
+import { Download, Printer } from 'lucide-react';
+import ReportHeader from '@/components/ReportHeader';
+import ReportFilters from '@/components/ReportFilters';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function GeneralLedger() {
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">General Ledger</h1>
           <p className="text-sm text-muted-foreground">Chart of accounts and balances</p>
         </div>
-        <button className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-input text-foreground font-medium text-sm hover:bg-muted transition-colors">
-          <Download size={18} /> Export
-        </button>
+        <div className="flex gap-2">
+          <button className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-input text-foreground font-medium text-sm hover:bg-muted transition-colors">
+            <Download size={18} /> Export
+          </button>
+          <button onClick={() => window.print()} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-input text-foreground font-medium text-sm hover:bg-muted transition-colors">
+            <Printer size={18} /> Print
+          </button>
+        </div>
       </div>
 
+      <Card className="light-card-blue print:hidden">
+        <CardContent className="pt-4">
+          <ReportFilters dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo} />
+        </CardContent>
+      </Card>
+
       <div className="bg-card rounded-xl shadow-card overflow-hidden">
+        <div className="p-6">
+          <ReportHeader reportTitle="General Ledger" subtitle={dateFrom || dateTo ? `${dateFrom || '...'} to ${dateTo || '...'}` : `As at ${new Date().toLocaleDateString()}`} />
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

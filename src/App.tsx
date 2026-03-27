@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { BranchProvider } from "@/contexts/BranchContext";
+import { SchoolSettingsProvider } from "@/contexts/SchoolSettingsContext";
 import AppLayout from "@/components/layout/AppLayout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -30,6 +31,7 @@ import Subjects from "@/pages/academics/Subjects";
 import Classes from "@/pages/academics/Classes";
 import ContinuousAssessment from "@/pages/academics/ContinuousAssessment";
 import PlaceholderPage from "@/pages/PlaceholderPage";
+import SchoolSettings from "@/pages/admin/SchoolSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +39,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
+      <SchoolSettingsProvider>
       <BranchProvider>
       <AuthProvider>
         <TooltipProvider>
@@ -81,7 +84,7 @@ const App = () => (
                 <Route path="/hr/departments" element={<PlaceholderPage />} />
                 <Route path="/assets" element={<Assets />} />
                 <Route path="/inventory" element={<Inventory />} />
-                <Route path="/admin/settings" element={<PlaceholderPage />} />
+                <Route path="/admin/settings" element={<SchoolSettings />} />
                 <Route path="/admin/roles" element={<PlaceholderPage />} />
                 <Route path="/admin/announcements" element={<PlaceholderPage />} />
               </Route>
@@ -91,6 +94,7 @@ const App = () => (
         </TooltipProvider>
       </AuthProvider>
       </BranchProvider>
+      </SchoolSettingsProvider>
     </ThemeProvider>
   </QueryClientProvider>
 );
