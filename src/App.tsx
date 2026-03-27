@@ -39,6 +39,7 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
+      <SchoolSettingsProvider>
       <BranchProvider>
       <AuthProvider>
         <TooltipProvider>
