@@ -56,6 +56,8 @@ const navItems: NavItem[] = [
       { label: 'Currency & Payments', path: '/finance/currency' },
       { label: 'Creditors', path: '/finance/creditors' },
       { label: 'Bank Reconciliation', path: '/finance/bank-recon' },
+      { label: 'Creditors Reconciliation', path: '/finance/creditors-recon' },
+      { label: 'Debtors Reconciliation', path: '/finance/debtors-recon' },
     ]
   },
   {

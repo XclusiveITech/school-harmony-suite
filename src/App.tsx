@@ -73,7 +73,9 @@ const App = () => (
                 <Route path="/finance/receipts" element={<Receipts />} />
                 <Route path="/finance/currency" element={<CurrencySettings />} />
                 <Route path="/finance/creditors" element={<PlaceholderPage />} />
-                <Route path="/finance/bank-recon" element={<PlaceholderPage />} />
+                <Route path="/finance/bank-recon" element={<BankReconciliation />} />
+                <Route path="/finance/creditors-recon" element={<CreditorsReconciliation />} />
+                <Route path="/finance/debtors-recon" element={<DebtorsReconciliation />} />
                 <Route path="/reports/trial-balance" element={<TrialBalance />} />
                 <Route path="/reports/balance-sheet" element={<BalanceSheet />} />
                 <Route path="/reports/income-statement" element={<IncomeStatement />} />
