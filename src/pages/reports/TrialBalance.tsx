@@ -1,18 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { glAccounts } from '@/lib/dummy-data';
-import { Download, Printer } from 'lucide-react';
+import { Printer } from 'lucide-react';
+import ReportHeader from '@/components/ReportHeader';
+import ReportFilters from '@/components/ReportFilters';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function TrialBalance() {
-  const debits = glAccounts.filter(a => {
-    if (a.type === 'Asset' || a.type === 'Expense') return a.balance > 0;
-    if (a.type === 'Liability' || a.type === 'Equity' || a.type === 'Revenue') return a.balance < 0;
-    return false;
-  });
-  const credits = glAccounts.filter(a => {
-    if (a.type === 'Liability' || a.type === 'Equity' || a.type === 'Revenue') return a.balance > 0;
-    if (a.type === 'Asset') return a.balance < 0;
-    return false;
-  });
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const totalDebit = glAccounts.reduce((s, a) => {
     if ((a.type === 'Asset' && a.balance > 0) || a.type === 'Expense') return s + Math.abs(a.balance);
@@ -24,22 +19,31 @@ export default function TrialBalance() {
     return s;
   }, 0);
 
+  const subtitle = dateFrom || dateTo
+    ? `${dateFrom ? `From ${dateFrom}` : ''}${dateFrom && dateTo ? ' ' : ''}${dateTo ? `To ${dateTo}` : ''}`
+    : `As at ${new Date().toLocaleDateString()}`;
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Trial Balance</h1>
-          <p className="text-sm text-muted-foreground">As at March 25, 2026</p>
+          <p className="text-sm text-muted-foreground">As at {new Date().toLocaleDateString()}</p>
         </div>
         <button onClick={() => window.print()} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-input text-foreground font-medium text-sm hover:bg-muted transition-colors">
           <Printer size={18} /> Print
         </button>
       </div>
 
+      <Card className="light-card-blue print:hidden">
+        <CardContent className="pt-4">
+          <ReportFilters dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo} />
+        </CardContent>
+      </Card>
+
       <div className="bg-card rounded-xl shadow-card overflow-hidden">
-        <div className="p-4 border-b border-border text-center print-only hidden">
-          <h2 className="font-display text-lg font-bold text-foreground">Brainstar School</h2>
-          <p className="text-sm text-muted-foreground">Trial Balance as at March 25, 2026</p>
+        <div className="p-6">
+          <ReportHeader reportTitle="Trial Balance" subtitle={subtitle} />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

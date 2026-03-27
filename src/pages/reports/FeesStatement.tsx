@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { students, classes } from '@/lib/dummy-data';
-import { Printer, Search, Filter } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Printer } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import ReportHeader from '@/components/ReportHeader';
+import ReportFilters from '@/components/ReportFilters';
 
 interface FeeItem {
   date: string;
@@ -53,10 +55,7 @@ function StudentStatement({ student, feeItems, dateFrom, dateTo }: { student: ty
 
   return (
     <div className="bg-card rounded-xl p-6 shadow-card print-page">
-      <div className="mb-4 pb-4 border-b border-border">
-        <h2 className="font-display font-bold text-card-foreground">{student.firstName} {student.lastName}</h2>
-        <p className="text-sm text-muted-foreground">Reg: {student.regNumber} | {student.level} - {student.className}</p>
-      </div>
+      <ReportHeader reportTitle="Fees Statement" subtitle={`${student.firstName} ${student.lastName} | Reg: ${student.regNumber} | ${student.level} - ${student.className}`} />
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border">
@@ -116,7 +115,7 @@ export default function FeesStatement() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Fees Statement</h1>
           <p className="text-sm text-muted-foreground">Individual or bulk student fees statements</p>
@@ -126,9 +125,9 @@ export default function FeesStatement() {
         </button>
       </div>
 
-      <Card className="light-card-blue">
+      <Card className="light-card-blue print:hidden">
         <CardContent className="pt-4">
-          <div className="flex gap-3 flex-wrap items-end">
+          <ReportFilters dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo}>
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">Level</label>
               <select value={filterLevel} onChange={e => { setFilterLevel(e.target.value); setFilterClass(''); setSelectedStudent('all'); }} className={selectClass}>
@@ -150,15 +149,7 @@ export default function FeesStatement() {
                 {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.regNumber})</option>)}
               </select>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">From</label>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={selectClass} />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1">To</label>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={selectClass} />
-            </div>
-          </div>
+          </ReportFilters>
         </CardContent>
       </Card>
 
