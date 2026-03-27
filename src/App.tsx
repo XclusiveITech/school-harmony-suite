@@ -32,6 +32,9 @@ import Classes from "@/pages/academics/Classes";
 import ContinuousAssessment from "@/pages/academics/ContinuousAssessment";
 import PlaceholderPage from "@/pages/PlaceholderPage";
 import SchoolSettings from "@/pages/admin/SchoolSettings";
+import BankReconciliation from "@/pages/finance/BankReconciliation";
+import CreditorsReconciliation from "@/pages/finance/CreditorsReconciliation";
+import DebtorsReconciliation from "@/pages/finance/DebtorsReconciliation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
