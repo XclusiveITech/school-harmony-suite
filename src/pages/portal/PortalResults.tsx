@@ -61,7 +61,7 @@ export default function PortalResults() {
       </div>
 
       <div className="bg-card rounded-xl shadow-card p-6">
-        <ReportHeader title={`Academic Report - ${selectedExam}`} />
+        <ReportHeader reportTitle={`Academic Report - ${selectedExam}`} />
 
         <div className="mt-4 mb-4 grid grid-cols-2 gap-4 text-sm">
           <div>

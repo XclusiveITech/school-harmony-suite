@@ -46,7 +46,7 @@ export default function PortalFees() {
       </div>
 
       <div className="bg-card rounded-xl shadow-card p-6">
-        <ReportHeader title="Student Fees Statement" />
+        <ReportHeader reportTitle="Student Fees Statement" />
         <div className="mt-4 mb-4 grid grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-muted-foreground">Student: <span className="font-medium text-foreground">{student.firstName} {student.lastName}</span></p>

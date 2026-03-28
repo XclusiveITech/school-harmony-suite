@@ -116,6 +116,12 @@ export default function Login() {
               <p><span className="font-medium text-foreground">Accountant:</span> accountant@brainstar.edu / test123</p>
             </div>
           </div>
+
+          <div className="mt-4">
+            <Link to="/portal/login" className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border-2 border-[hsl(142_71%_45%)] text-[hsl(142_71%_45%)] font-semibold hover:bg-[hsl(142_71%_45%)]/10 transition-colors text-sm">
+              <GraduationCap size={18} /> Go to Student Portal
+            </Link>
+          </div>
         </div>
       </div>
     </div>

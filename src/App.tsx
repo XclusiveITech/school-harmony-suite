@@ -102,6 +102,17 @@ const App = () => (
                 <Route path="/admin/roles" element={<PlaceholderPage />} />
                 <Route path="/admin/announcements" element={<PlaceholderPage />} />
               </Route>
+              {/* Student Portal */}
+              <Route path="/portal/login" element={<StudentPortalLogin />} />
+              <Route element={<StudentPortalLayout />}>
+                <Route path="/portal/dashboard" element={<PortalDashboard />} />
+                <Route path="/portal/fees" element={<PortalFees />} />
+                <Route path="/portal/academics" element={<PortalAcademics />} />
+                <Route path="/portal/assessment" element={<PortalAssessment />} />
+                <Route path="/portal/exams" element={<PortalExams />} />
+                <Route path="/portal/results" element={<PortalResults />} />
+                <Route path="/portal/notices" element={<PortalNotices />} />
+              </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
