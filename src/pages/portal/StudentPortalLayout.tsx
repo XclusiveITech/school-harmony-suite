@@ -22,7 +22,7 @@ const navItems = [
   { to: '/portal/exams', icon: GraduationCap, label: 'Examinations' },
   { to: '/portal/results', icon: Award, label: 'Results' },
   { to: '/portal/notices', icon: Bell, label: 'Notice Board' },
-  { to: '/portal/profile', icon: UserCog, label: 'My Profile' },
+  { to: '/portal/profile', icon: Settings, label: 'My Profile' },
 ];
 
 export default function StudentPortalLayout() {
