@@ -137,7 +137,7 @@ export default function PortalProfile() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Gender</Label>
-                  <Input value={profile.gender} onChange={e => setProfile(p => ({ ...p, gender: e.target.value }))} />
+                  <Input value={profile.gender} onChange={e => setProfile(p => ({ ...p, gender: e.target.value as 'Male' | 'Female' }))} />
                 </div>
               </div>
 
