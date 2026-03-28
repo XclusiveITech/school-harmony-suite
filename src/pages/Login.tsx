@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Landmark, Eye, EyeOff } from 'lucide-react';
+import { Landmark, Eye, EyeOff, GraduationCap } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
@@ -114,6 +115,12 @@ export default function Login() {
               <p><span className="font-medium text-foreground">Teacher:</span> teacher@brainstar.edu / test123</p>
               <p><span className="font-medium text-foreground">Accountant:</span> accountant@brainstar.edu / test123</p>
             </div>
+          </div>
+
+          <div className="mt-4">
+            <Link to="/portal/login" className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border-2 border-[hsl(142_71%_45%)] text-[hsl(142_71%_45%)] font-semibold hover:bg-[hsl(142_71%_45%)]/10 transition-colors text-sm">
+              <GraduationCap size={18} /> Go to Student Portal
+            </Link>
           </div>
         </div>
       </div>

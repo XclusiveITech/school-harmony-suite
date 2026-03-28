@@ -36,6 +36,15 @@ import BankReconciliation from "@/pages/finance/BankReconciliation";
 import CreditorsReconciliation from "@/pages/finance/CreditorsReconciliation";
 import DebtorsReconciliation from "@/pages/finance/DebtorsReconciliation";
 import NotFound from "./pages/NotFound";
+import StudentPortalLogin from "./pages/portal/StudentPortalLogin";
+import StudentPortalLayout from "./pages/portal/StudentPortalLayout";
+import PortalDashboard from "./pages/portal/PortalDashboard";
+import PortalFees from "./pages/portal/PortalFees";
+import PortalAcademics from "./pages/portal/PortalAcademics";
+import PortalAssessment from "./pages/portal/PortalAssessment";
+import PortalExams from "./pages/portal/PortalExams";
+import PortalResults from "./pages/portal/PortalResults";
+import PortalNotices from "./pages/portal/PortalNotices";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +101,17 @@ const App = () => (
                 <Route path="/admin/settings" element={<SchoolSettings />} />
                 <Route path="/admin/roles" element={<PlaceholderPage />} />
                 <Route path="/admin/announcements" element={<PlaceholderPage />} />
+              </Route>
+              {/* Student Portal */}
+              <Route path="/portal/login" element={<StudentPortalLogin />} />
+              <Route element={<StudentPortalLayout />}>
+                <Route path="/portal/dashboard" element={<PortalDashboard />} />
+                <Route path="/portal/fees" element={<PortalFees />} />
+                <Route path="/portal/academics" element={<PortalAcademics />} />
+                <Route path="/portal/assessment" element={<PortalAssessment />} />
+                <Route path="/portal/exams" element={<PortalExams />} />
+                <Route path="/portal/results" element={<PortalResults />} />
+                <Route path="/portal/notices" element={<PortalNotices />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
