@@ -36,6 +36,15 @@ import BankReconciliation from "@/pages/finance/BankReconciliation";
 import CreditorsReconciliation from "@/pages/finance/CreditorsReconciliation";
 import DebtorsReconciliation from "@/pages/finance/DebtorsReconciliation";
 import NotFound from "./pages/NotFound";
+import StudentPortalLogin from "./pages/portal/StudentPortalLogin";
+import StudentPortalLayout from "./pages/portal/StudentPortalLayout";
+import PortalDashboard from "./pages/portal/PortalDashboard";
+import PortalFees from "./pages/portal/PortalFees";
+import PortalAcademics from "./pages/portal/PortalAcademics";
+import PortalAssessment from "./pages/portal/PortalAssessment";
+import PortalExams from "./pages/portal/PortalExams";
+import PortalResults from "./pages/portal/PortalResults";
+import PortalNotices from "./pages/portal/PortalNotices";
 
 const queryClient = new QueryClient();
 
