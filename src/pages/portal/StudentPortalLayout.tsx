@@ -4,7 +4,7 @@ import { students, type Student } from '@/lib/dummy-data';
 import { useSchoolSettings } from '@/contexts/SchoolSettingsContext';
 import {
   LayoutDashboard, Receipt, BookOpen, GraduationCap, ClipboardList,
-  Award, Bell, LogOut, ChevronLeft, ChevronRight, Menu, X
+  Award, Bell, LogOut, ChevronLeft, ChevronRight, Menu, X, Settings
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -22,6 +22,7 @@ const navItems = [
   { to: '/portal/exams', icon: GraduationCap, label: 'Examinations' },
   { to: '/portal/results', icon: Award, label: 'Results' },
   { to: '/portal/notices', icon: Bell, label: 'Notice Board' },
+  { to: '/portal/profile', icon: Settings, label: 'My Profile' },
 ];
 
 export default function StudentPortalLayout() {

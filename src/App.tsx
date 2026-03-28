@@ -45,6 +45,7 @@ import PortalAssessment from "./pages/portal/PortalAssessment";
 import PortalExams from "./pages/portal/PortalExams";
 import PortalResults from "./pages/portal/PortalResults";
 import PortalNotices from "./pages/portal/PortalNotices";
+import PortalProfile from "./pages/portal/PortalProfile";
 
 const queryClient = new QueryClient();
 
@@ -112,6 +113,7 @@ const App = () => (
                 <Route path="/portal/exams" element={<PortalExams />} />
                 <Route path="/portal/results" element={<PortalResults />} />
                 <Route path="/portal/notices" element={<PortalNotices />} />
+                <Route path="/portal/profile" element={<PortalProfile />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
