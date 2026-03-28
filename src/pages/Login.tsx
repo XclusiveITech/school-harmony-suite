@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Landmark, Eye, EyeOff } from 'lucide-react';
+import { Landmark, Eye, EyeOff, GraduationCap } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
