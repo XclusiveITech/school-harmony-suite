@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { assets, assetAssignments, students, staff, type AssetAssignment } from '@/lib/dummy-data';
-import { Plus, Download, Printer, Search, Filter, Edit2, Trash2, Link2, Building2, Users, GraduationCap, AlertTriangle } from 'lucide-react';
+import { assets as initialAssets, assetAssignments, students, staff, type AssetAssignment, type Asset } from '@/lib/dummy-data';
+import { Plus, Printer, Search, Edit2, Trash2, Link2, Users, GraduationCap, AlertTriangle, X } from 'lucide-react';
 import ReportHeader from '@/components/ReportHeader';
 import ReportFilters from '@/components/ReportFilters';
 
@@ -9,22 +9,30 @@ type AssignFilter = 'All' | 'Student' | 'Staff';
 
 export default function Assets() {
   const [tab, setTab] = useState<Tab>('register');
+  const [assetList, setAssetList] = useState<Asset[]>(initialAssets);
   const [assignments, setAssignments] = useState<AssetAssignment[]>(assetAssignments);
   const [showForm, setShowForm] = useState(false);
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [editAssetId, setEditAssetId] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<AssignFilter>('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('2026-01-01');
   const [dateTo, setDateTo] = useState('2026-12-31');
 
-  // Form state
+  // Assignment form
   const [form, setForm] = useState({
     assetId: '', serialNumber: '', assignedTo: '', assignedToType: 'Student' as 'Student' | 'Staff',
     roomNumber: '', condition: 'Good' as AssetAssignment['condition'], notes: '', dateAssigned: new Date().toISOString().split('T')[0],
   });
 
-  const totalCost = assets.reduce((s, a) => s + a.cost, 0);
-  const totalCurrent = assets.reduce((s, a) => s + a.currentValue, 0);
+  // Register form
+  const [regForm, setRegForm] = useState({
+    name: '', category: '', purchaseDate: '', cost: '', depreciationRate: '', currentValue: '', location: '', serialNumbers: '',
+  });
+
+  const totalCost = assetList.reduce((s, a) => s + a.cost, 0);
+  const totalCurrent = assetList.reduce((s, a) => s + a.currentValue, 0);
 
   const filtered = assignments.filter(a => {
     if (filterType !== 'All' && a.assignedToType !== filterType) return false;
@@ -34,12 +42,18 @@ export default function Assets() {
   });
 
   const conditionColors: Record<string, string> = {
-    Excellent: 'bg-success/15 text-success',
-    Good: 'bg-info/15 text-info',
-    Fair: 'bg-warning/15 text-warning',
-    Poor: 'bg-destructive/15 text-destructive',
-    Damaged: 'bg-destructive/20 text-destructive',
+    Excellent: 'bg-success/15 text-success', Good: 'bg-info/15 text-info', Fair: 'bg-warning/15 text-warning',
+    Poor: 'bg-destructive/15 text-destructive', Damaged: 'bg-destructive/20 text-destructive',
   };
+
+  // Get serial numbers for selected asset, excluding already assigned ones
+  const selectedAsset = assetList.find(a => a.id === form.assetId);
+  const assignedSerials = assignments.filter(a => a.assetId === form.assetId && a.id !== editId).map(a => a.serialNumber);
+  const availableSerials = selectedAsset?.serialNumbers.filter(s => !assignedSerials.includes(s)) || [];
+
+  // Get selected student info
+  const selectedStudent = form.assignedToType === 'Student' ? students.find(s => s.id === form.assignedTo) : null;
+  const selectedStaff = form.assignedToType === 'Staff' ? staff.find(s => s.id === form.assignedTo) : null;
 
   const resetForm = () => {
     setForm({ assetId: '', serialNumber: '', assignedTo: '', assignedToType: 'Student', roomNumber: '', condition: 'Good', notes: '', dateAssigned: new Date().toISOString().split('T')[0] });
@@ -47,18 +61,49 @@ export default function Assets() {
     setShowForm(false);
   };
 
+  const resetRegForm = () => {
+    setRegForm({ name: '', category: '', purchaseDate: '', cost: '', depreciationRate: '', currentValue: '', location: '', serialNumbers: '' });
+    setEditAssetId(null);
+    setShowRegisterForm(false);
+  };
+
   const handleSave = () => {
     const personList = form.assignedToType === 'Student' ? students : staff;
     const person = personList.find(p => p.id === form.assignedTo);
-    const name = person ? (form.assignedToType === 'Student' ? `${(person as any).firstName} ${(person as any).lastName}` : `${(person as any).firstName} ${(person as any).lastName}`) : '';
-
+    const name = person ? `${(person as any).firstName} ${(person as any).lastName}` : '';
     if (editId) {
       setAssignments(prev => prev.map(a => a.id === editId ? { ...a, ...form, assignedToName: name } : a));
     } else {
-      const newA: AssetAssignment = { id: String(Date.now()), ...form, assignedToName: name };
-      setAssignments(prev => [...prev, newA]);
+      setAssignments(prev => [...prev, { id: String(Date.now()), ...form, assignedToName: name }]);
     }
     resetForm();
+  };
+
+  const handleRegisterSave = () => {
+    const serials = regForm.serialNumbers.split(',').map(s => s.trim()).filter(Boolean);
+    const newAsset: Asset = {
+      id: editAssetId || String(Date.now()),
+      name: regForm.name, category: regForm.category, purchaseDate: regForm.purchaseDate,
+      cost: Number(regForm.cost), depreciationRate: Number(regForm.depreciationRate),
+      currentValue: Number(regForm.currentValue), location: regForm.location, serialNumbers: serials,
+    };
+    if (editAssetId) {
+      setAssetList(prev => prev.map(a => a.id === editAssetId ? newAsset : a));
+    } else {
+      setAssetList(prev => [...prev, newAsset]);
+    }
+    resetRegForm();
+  };
+
+  const handleEditAsset = (a: Asset) => {
+    setRegForm({
+      name: a.name, category: a.category, purchaseDate: a.purchaseDate, cost: String(a.cost),
+      depreciationRate: String(a.depreciationRate), currentValue: String(a.currentValue), location: a.location,
+      serialNumbers: a.serialNumbers.join(', '),
+    });
+    setEditAssetId(a.id);
+    setShowRegisterForm(true);
+    setTab('register');
   };
 
   const handleEdit = (a: AssetAssignment) => {
@@ -88,13 +133,13 @@ export default function Assets() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Asset Management</h1>
-          <p className="text-sm text-muted-foreground">{assets.length} registered assets · {assignments.length} assignments</p>
+          <p className="text-sm text-muted-foreground">{assetList.length} registered assets · {assignments.length} assignments</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => { setShowForm(true); setTab('assignments'); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg gradient-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity">
             <Link2 size={18} /> Assign Asset
           </button>
-          <button className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg gradient-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity">
+          <button onClick={() => { setShowRegisterForm(true); setTab('register'); }} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg gradient-primary text-primary-foreground font-medium text-sm hover:opacity-90 transition-opacity">
             <Plus size={18} /> Register Asset
           </button>
         </div>
@@ -139,63 +184,142 @@ export default function Assets() {
         ))}
       </div>
 
-      {/* Asset Register */}
+      {/* ========== ASSET REGISTER TAB ========== */}
       {tab === 'register' && (
-        <div className="bg-card rounded-xl shadow-card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-muted">
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Asset Name</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Category</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Location</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Purchase Date</th>
-                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Cost ($)</th>
-                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Depr. Rate</th>
-                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Book Value ($)</th>
-                <th className="text-center px-4 py-3 font-medium text-muted-foreground">Assigned</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assets.map(a => {
-                const assignCount = assignments.filter(x => x.assetId === a.id).length;
-                return (
-                  <tr key={a.id} className="border-b border-border hover:bg-muted/50">
-                    <td className="px-4 py-3 font-medium text-foreground">{a.name}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{a.category}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{a.location}</td>
-                    <td className="px-4 py-3 text-foreground">{a.purchaseDate}</td>
-                    <td className="px-4 py-3 text-right text-foreground">${a.cost.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right text-foreground">{a.depreciationRate}%</td>
-                    <td className="px-4 py-3 text-right font-semibold text-foreground">${a.currentValue.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">{assignCount} items</span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Asset Assignments */}
-      {tab === 'assignments' && (
         <div className="space-y-4">
-          {/* Assignment Form */}
-          {showForm && (
+          {/* Register Form */}
+          {showRegisterForm && (
             <div className="bg-card rounded-xl p-6 shadow-card border border-border space-y-4">
-              <h3 className="font-display font-semibold text-foreground">{editId ? 'Edit' : 'New'} Asset Assignment</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-semibold text-foreground">{editAssetId ? 'Edit' : 'Register New'} Asset</h3>
+                <button onClick={resetRegForm} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"><X size={18} /></button>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Asset</label>
-                  <select value={form.assetId} onChange={e => setForm(p => ({ ...p, assetId: e.target.value }))} className={selectClass + ' w-full'}>
-                    <option value="">Select Asset</option>
-                    {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Asset Name *</label>
+                  <input value={regForm.name} onChange={e => setRegForm(p => ({ ...p, name: e.target.value }))} className={inputClass} placeholder="e.g. Classroom Desks" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Category *</label>
+                  <select value={regForm.category} onChange={e => setRegForm(p => ({ ...p, category: e.target.value }))} className={selectClass + ' w-full'}>
+                    <option value="">Select Category</option>
+                    {['Furniture', 'IT Equipment', 'Vehicles', 'Lab Equipment', 'Office Equipment', 'Sports Equipment', 'Other'].map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Serial Number</label>
-                  <input value={form.serialNumber} onChange={e => setForm(p => ({ ...p, serialNumber: e.target.value }))} className={inputClass} placeholder="e.g. FRN-DESK-005" />
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Purchase Date *</label>
+                  <input type="date" value={regForm.purchaseDate} onChange={e => setRegForm(p => ({ ...p, purchaseDate: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Location</label>
+                  <input value={regForm.location} onChange={e => setRegForm(p => ({ ...p, location: e.target.value }))} className={inputClass} placeholder="e.g. Computer Lab" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Cost ($) *</label>
+                  <input type="number" value={regForm.cost} onChange={e => setRegForm(p => ({ ...p, cost: e.target.value }))} className={inputClass} placeholder="0.00" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Depreciation Rate (%)</label>
+                  <input type="number" value={regForm.depreciationRate} onChange={e => setRegForm(p => ({ ...p, depreciationRate: e.target.value }))} className={inputClass} placeholder="10" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Current Book Value ($)</label>
+                  <input type="number" value={regForm.currentValue} onChange={e => setRegForm(p => ({ ...p, currentValue: e.target.value }))} className={inputClass} placeholder="0.00" />
+                </div>
+                <div className="sm:col-span-2 lg:col-span-1">
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Serial Numbers *</label>
+                  <input value={regForm.serialNumbers} onChange={e => setRegForm(p => ({ ...p, serialNumbers: e.target.value }))} className={inputClass} placeholder="SN-001, SN-002, SN-003 (comma separated)" />
+                  <p className="text-xs text-muted-foreground mt-1">Separate multiple with commas</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleRegisterSave} disabled={!regForm.name || !regForm.category || !regForm.cost || !regForm.serialNumbers} className="px-4 py-2.5 rounded-lg gradient-primary text-primary-foreground font-medium text-sm hover:opacity-90 disabled:opacity-50">
+                  {editAssetId ? 'Update' : 'Register'} Asset
+                </button>
+                <button onClick={resetRegForm} className="px-4 py-2.5 rounded-lg border border-border text-foreground text-sm hover:bg-muted">Cancel</button>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-card rounded-xl shadow-card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted">
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Asset Name</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Category</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Serial Numbers</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Location</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Purchase Date</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Cost ($)</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Depr. Rate</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Book Value ($)</th>
+                  <th className="text-center px-4 py-3 font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assetList.map(a => {
+                  const assignCount = assignments.filter(x => x.assetId === a.id).length;
+                  return (
+                    <tr key={a.id} className="border-b border-border hover:bg-muted/50">
+                      <td className="px-4 py-3 font-medium text-foreground">{a.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{a.category}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {a.serialNumbers.slice(0, 3).map(s => (
+                            <span key={s} className="px-1.5 py-0.5 rounded text-xs font-mono bg-muted text-foreground">{s}</span>
+                          ))}
+                          {a.serialNumbers.length > 3 && <span className="text-xs text-muted-foreground">+{a.serialNumbers.length - 3} more</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{a.location}</td>
+                      <td className="px-4 py-3 text-foreground">{a.purchaseDate}</td>
+                      <td className="px-4 py-3 text-right text-foreground">${a.cost.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right text-foreground">{a.depreciationRate}%</td>
+                      <td className="px-4 py-3 text-right font-semibold text-foreground">${a.currentValue.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary mr-1">{assignCount} assigned</span>
+                          <button onClick={() => handleEditAsset(a)} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"><Edit2 size={14} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ========== ASSET ASSIGNMENTS TAB ========== */}
+      {tab === 'assignments' && (
+        <div className="space-y-4">
+          {showForm && (
+            <div className="bg-card rounded-xl p-6 shadow-card border border-border space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-display font-semibold text-foreground">{editId ? 'Edit' : 'New'} Asset Assignment</h3>
+                <button onClick={resetForm} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"><X size={18} /></button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Asset *</label>
+                  <select value={form.assetId} onChange={e => setForm(p => ({ ...p, assetId: e.target.value, serialNumber: '' }))} className={selectClass + ' w-full'}>
+                    <option value="">Select Asset</option>
+                    {assetList.map(a => <option key={a.id} value={a.id}>{a.name} ({a.serialNumbers.length} items)</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Serial Number *</label>
+                  <select value={form.serialNumber} onChange={e => setForm(p => ({ ...p, serialNumber: e.target.value }))} className={selectClass + ' w-full'} disabled={!form.assetId}>
+                    <option value="">{form.assetId ? 'Pick serial number' : 'Select asset first'}</option>
+                    {availableSerials.map(s => <option key={s} value={s}>{s}</option>)}
+                    {editId && form.serialNumber && !availableSerials.includes(form.serialNumber) && (
+                      <option value={form.serialNumber}>{form.serialNumber} (current)</option>
+                    )}
+                  </select>
+                  {form.assetId && availableSerials.length === 0 && !editId && (
+                    <p className="text-xs text-destructive mt-1">All serial numbers are assigned</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Assign To</label>
@@ -205,7 +329,7 @@ export default function Assets() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">{form.assignedToType}</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">{form.assignedToType} *</label>
                   <select value={form.assignedTo} onChange={e => setForm(p => ({ ...p, assignedTo: e.target.value }))} className={selectClass + ' w-full'}>
                     <option value="">Select {form.assignedToType}</option>
                     {form.assignedToType === 'Student'
@@ -214,8 +338,21 @@ export default function Assets() {
                     }
                   </select>
                 </div>
+
+                {/* Auto-display student class or staff department */}
+                {form.assignedTo && (
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1">
+                      {form.assignedToType === 'Student' ? 'Class / Level' : 'Department'}
+                    </label>
+                    <div className="px-3 py-2.5 rounded-lg border border-input bg-muted text-foreground text-sm">
+                      {selectedStudent ? `${selectedStudent.className} — ${selectedStudent.level}` : selectedStaff ? `${selectedStaff.department} — ${selectedStaff.role}` : '—'}
+                    </div>
+                  </div>
+                )}
+
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Room Number</label>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Room Number *</label>
                   <input value={form.roomNumber} onChange={e => setForm(p => ({ ...p, roomNumber: e.target.value }))} className={inputClass} placeholder="e.g. Room 3A" />
                 </div>
                 <div>
@@ -264,16 +401,19 @@ export default function Assets() {
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Asset</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Type</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Assigned To</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Class/Dept</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Room</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Condition</th>
                   <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Notes</th>
                   <th className="text-center px-4 py-3 font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(a => {
-                  const asset = assets.find(x => x.id === a.assetId);
+                  const asset = assetList.find(x => x.id === a.assetId);
+                  const stu = a.assignedToType === 'Student' ? students.find(s => s.id === a.assignedTo) : null;
+                  const stf = a.assignedToType === 'Staff' ? staff.find(s => s.id === a.assignedTo) : null;
+                  const classDept = stu ? stu.className : stf ? stf.department : '—';
                   return (
                     <tr key={a.id} className="border-b border-border hover:bg-muted/50">
                       <td className="px-4 py-3 font-mono text-xs font-semibold text-foreground">{a.serialNumber}</td>
@@ -284,12 +424,12 @@ export default function Assets() {
                         </span>
                       </td>
                       <td className="px-4 py-3 font-medium text-foreground">{a.assignedToName}</td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{classDept}</td>
                       <td className="px-4 py-3 text-muted-foreground">{a.roomNumber}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${conditionColors[a.condition]}`}>{a.condition}</span>
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{a.dateAssigned}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground max-w-[150px] truncate">{a.notes || '—'}</td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => handleEdit(a)} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"><Edit2 size={14} /></button>
@@ -308,7 +448,7 @@ export default function Assets() {
         </div>
       )}
 
-      {/* Printable Report */}
+      {/* ========== PRINTABLE REPORT TAB ========== */}
       {tab === 'report' && (
         <div className="space-y-4">
           <div className="print:hidden">
@@ -327,7 +467,6 @@ export default function Assets() {
           <div className="bg-card rounded-xl shadow-card p-6 print:shadow-none print:p-0">
             <ReportHeader reportTitle="Asset Assignment Report" subtitle={`${filterType === 'All' ? 'All' : filterType} Assignments — ${dateFrom} to ${dateTo}`} />
 
-            {/* Summary */}
             <div className="grid grid-cols-3 gap-4 mb-6 text-center">
               <div className="p-3 rounded-lg bg-muted">
                 <p className="text-xs text-muted-foreground">Total Assignments</p>
@@ -343,7 +482,6 @@ export default function Assets() {
               </div>
             </div>
 
-            {/* Student Section */}
             {(filterType === 'All' || filterType === 'Student') && (
               <>
                 <h4 className="font-display font-semibold text-foreground mt-4 mb-2 flex items-center gap-2"><GraduationCap size={16} /> Student Assignments</h4>
@@ -352,31 +490,33 @@ export default function Assets() {
                     <tr className="border-b-2 border-primary">
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Serial #</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Asset</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Student Name</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Student</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Class</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Room</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Condition</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Date</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Notes</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.filter(a => a.assignedToType === 'Student').map(a => (
-                      <tr key={a.id} className="border-b border-border">
-                        <td className="px-3 py-2 font-mono text-xs">{a.serialNumber}</td>
-                        <td className="px-3 py-2">{assets.find(x => x.id === a.assetId)?.name}</td>
-                        <td className="px-3 py-2 font-medium">{a.assignedToName}</td>
-                        <td className="px-3 py-2">{a.roomNumber}</td>
-                        <td className="px-3 py-2">{a.condition}</td>
-                        <td className="px-3 py-2">{a.dateAssigned}</td>
-                        <td className="px-3 py-2 text-xs">{a.notes || '—'}</td>
-                      </tr>
-                    ))}
+                    {filtered.filter(a => a.assignedToType === 'Student').map(a => {
+                      const stu = students.find(s => s.id === a.assignedTo);
+                      return (
+                        <tr key={a.id} className="border-b border-border">
+                          <td className="px-3 py-2 font-mono text-xs">{a.serialNumber}</td>
+                          <td className="px-3 py-2">{assetList.find(x => x.id === a.assetId)?.name}</td>
+                          <td className="px-3 py-2 font-medium">{a.assignedToName}</td>
+                          <td className="px-3 py-2 text-xs">{stu?.className || '—'}</td>
+                          <td className="px-3 py-2">{a.roomNumber}</td>
+                          <td className="px-3 py-2">{a.condition}</td>
+                          <td className="px-3 py-2">{a.dateAssigned}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </>
             )}
 
-            {/* Staff Section */}
             {(filterType === 'All' || filterType === 'Staff') && (
               <>
                 <h4 className="font-display font-semibold text-foreground mt-4 mb-2 flex items-center gap-2"><Users size={16} /> Staff Assignments</h4>
@@ -386,30 +526,32 @@ export default function Assets() {
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Serial #</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Asset</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Staff Member</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Department</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Room</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Condition</th>
                       <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Date</th>
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Notes</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.filter(a => a.assignedToType === 'Staff').map(a => (
-                      <tr key={a.id} className="border-b border-border">
-                        <td className="px-3 py-2 font-mono text-xs">{a.serialNumber}</td>
-                        <td className="px-3 py-2">{assets.find(x => x.id === a.assetId)?.name}</td>
-                        <td className="px-3 py-2 font-medium">{a.assignedToName}</td>
-                        <td className="px-3 py-2">{a.roomNumber}</td>
-                        <td className="px-3 py-2">{a.condition}</td>
-                        <td className="px-3 py-2">{a.dateAssigned}</td>
-                        <td className="px-3 py-2 text-xs">{a.notes || '—'}</td>
-                      </tr>
-                    ))}
+                    {filtered.filter(a => a.assignedToType === 'Staff').map(a => {
+                      const stf = staff.find(s => s.id === a.assignedTo);
+                      return (
+                        <tr key={a.id} className="border-b border-border">
+                          <td className="px-3 py-2 font-mono text-xs">{a.serialNumber}</td>
+                          <td className="px-3 py-2">{assetList.find(x => x.id === a.assetId)?.name}</td>
+                          <td className="px-3 py-2 font-medium">{a.assignedToName}</td>
+                          <td className="px-3 py-2 text-xs">{stf?.department || '—'}</td>
+                          <td className="px-3 py-2">{a.roomNumber}</td>
+                          <td className="px-3 py-2">{a.condition}</td>
+                          <td className="px-3 py-2">{a.dateAssigned}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </>
             )}
 
-            {/* Condition Summary */}
             <h4 className="font-display font-semibold text-foreground mt-4 mb-2">Condition Summary</h4>
             <div className="grid grid-cols-5 gap-2 text-center text-sm">
               {['Excellent', 'Good', 'Fair', 'Poor', 'Damaged'].map(c => (
