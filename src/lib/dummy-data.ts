@@ -189,6 +189,32 @@ export const assets = [
   { id: '4', name: 'Classroom Furniture', category: 'Furniture', purchaseDate: '2021-09-01', cost: 35000, depreciationRate: 10, currentValue: 24500, location: 'Classrooms' },
 ];
 
+export interface AssetAssignment {
+  id: string;
+  assetId: string;
+  serialNumber: string;
+  assignedTo: string;
+  assignedToType: 'Student' | 'Staff';
+  assignedToName: string;
+  roomNumber: string;
+  condition: 'Excellent' | 'Good' | 'Fair' | 'Poor' | 'Damaged';
+  dateAssigned: string;
+  notes?: string;
+}
+
+export const assetAssignments: AssetAssignment[] = [
+  { id: '1', assetId: '4', serialNumber: 'FRN-DESK-001', assignedTo: '1', assignedToType: 'Student', assignedToName: 'Henry Murinda', roomNumber: 'Room 3A', condition: 'Good', dateAssigned: '2026-01-15', notes: 'Wooden desk with drawer' },
+  { id: '2', assetId: '4', serialNumber: 'FRN-DESK-002', assignedTo: '2', assignedToType: 'Student', assignedToName: 'Tinashe Chikara', roomNumber: 'Room 2B', condition: 'Excellent', dateAssigned: '2026-01-15' },
+  { id: '3', assetId: '4', serialNumber: 'FRN-CHAIR-001', assignedTo: '3', assignedToType: 'Student', assignedToName: 'Rudo Nyathi', roomNumber: 'Room 3A', condition: 'Fair', dateAssigned: '2026-01-15', notes: 'Minor scratch on surface' },
+  { id: '4', assetId: '4', serialNumber: 'FRN-DESK-003', assignedTo: '4', assignedToType: 'Student', assignedToName: 'Kudzai Moyo', roomNumber: 'Room 1A', condition: 'Good', dateAssigned: '2026-01-16' },
+  { id: '5', assetId: '1', serialNumber: 'IT-PC-001', assignedTo: '1', assignedToType: 'Staff', assignedToName: 'John Banda', roomNumber: 'Science Lab', condition: 'Good', dateAssigned: '2023-07-01', notes: 'Dell OptiPlex 7090' },
+  { id: '6', assetId: '1', serialNumber: 'IT-PC-002', assignedTo: '3', assignedToType: 'Staff', assignedToName: 'David Phiri', roomNumber: 'Admin Office', condition: 'Excellent', dateAssigned: '2023-07-01', notes: 'HP ProDesk 400' },
+  { id: '7', assetId: '1', serialNumber: 'IT-PC-003', assignedTo: '4', assignedToType: 'Staff', assignedToName: 'Linda Zuze', roomNumber: 'Finance Office', condition: 'Good', dateAssigned: '2023-07-05', notes: 'Lenovo ThinkCentre' },
+  { id: '8', assetId: '4', serialNumber: 'FRN-CABINET-001', assignedTo: '2', assignedToType: 'Staff', assignedToName: 'Sarah Ncube', roomNumber: 'Maths Dept', condition: 'Good', dateAssigned: '2024-02-10', notes: 'Filing cabinet 4-drawer' },
+  { id: '9', assetId: '4', serialNumber: 'FRN-DESK-004', assignedTo: '5', assignedToType: 'Student', assignedToName: 'Tatenda Dube', roomNumber: 'Room 4A', condition: 'Poor', dateAssigned: '2026-01-16', notes: 'Needs repair - wobbly leg' },
+  { id: '10', assetId: '4', serialNumber: 'FRN-CHAIR-002', assignedTo: '6', assignedToType: 'Student', assignedToName: 'Chipo Madziva', roomNumber: 'Room 2A', condition: 'Excellent', dateAssigned: '2026-01-16' },
+];
+
 export const inventory = [
   { id: '1', name: 'Exercise Books (48pg)', category: 'Stationery', quantity: 2500, warehouse: 'Main Store', unitCost: 0.50, reorderLevel: 500 },
   { id: '2', name: 'Blue Pens', category: 'Stationery', quantity: 1200, warehouse: 'Main Store', unitCost: 0.25, reorderLevel: 300 },
