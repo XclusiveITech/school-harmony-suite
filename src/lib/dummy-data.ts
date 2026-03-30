@@ -182,11 +182,23 @@ export const attendanceData = [
   { day: 'Fri', present: 158, absent: 11 },
 ];
 
-export const assets = [
-  { id: '1', name: 'Desktop Computers (Lab)', category: 'IT Equipment', purchaseDate: '2023-06-15', cost: 25000, depreciationRate: 25, currentValue: 15625, location: 'Computer Lab' },
-  { id: '2', name: 'School Bus - ZH1234', category: 'Vehicles', purchaseDate: '2022-01-10', cost: 65000, depreciationRate: 20, currentValue: 41600, location: 'Parking' },
-  { id: '3', name: 'Laboratory Equipment', category: 'Lab Equipment', purchaseDate: '2024-02-20', cost: 18000, depreciationRate: 15, currentValue: 15300, location: 'Science Lab' },
-  { id: '4', name: 'Classroom Furniture', category: 'Furniture', purchaseDate: '2021-09-01', cost: 35000, depreciationRate: 10, currentValue: 24500, location: 'Classrooms' },
+export interface Asset {
+  id: string;
+  name: string;
+  category: string;
+  purchaseDate: string;
+  cost: number;
+  depreciationRate: number;
+  currentValue: number;
+  location: string;
+  serialNumbers: string[];
+}
+
+export const assets: Asset[] = [
+  { id: '1', name: 'Desktop Computers (Lab)', category: 'IT Equipment', purchaseDate: '2023-06-15', cost: 25000, depreciationRate: 25, currentValue: 15625, location: 'Computer Lab', serialNumbers: ['IT-PC-001', 'IT-PC-002', 'IT-PC-003', 'IT-PC-004', 'IT-PC-005'] },
+  { id: '2', name: 'School Bus - ZH1234', category: 'Vehicles', purchaseDate: '2022-01-10', cost: 65000, depreciationRate: 20, currentValue: 41600, location: 'Parking', serialNumbers: ['VEH-BUS-001'] },
+  { id: '3', name: 'Laboratory Equipment', category: 'Lab Equipment', purchaseDate: '2024-02-20', cost: 18000, depreciationRate: 15, currentValue: 15300, location: 'Science Lab', serialNumbers: ['LAB-EQ-001', 'LAB-EQ-002', 'LAB-EQ-003'] },
+  { id: '4', name: 'Classroom Furniture', category: 'Furniture', purchaseDate: '2021-09-01', cost: 35000, depreciationRate: 10, currentValue: 24500, location: 'Classrooms', serialNumbers: ['FRN-DESK-001', 'FRN-DESK-002', 'FRN-DESK-003', 'FRN-DESK-004', 'FRN-CHAIR-001', 'FRN-CHAIR-002', 'FRN-CABINET-001'] },
 ];
 
 export interface AssetAssignment {
