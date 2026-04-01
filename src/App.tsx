@@ -84,7 +84,8 @@ const App = () => (
                 <Route path="/finance/invoices" element={<Invoices />} />
                 <Route path="/finance/receipts" element={<Receipts />} />
                 <Route path="/finance/currency" element={<CurrencySettings />} />
-                <Route path="/finance/creditors" element={<PlaceholderPage />} />
+                <Route path="/finance/creditors" element={<Creditors />} />
+                <Route path="/finance/debtors" element={<Debtors />} />
                 <Route path="/finance/bank-recon" element={<BankReconciliation />} />
                 <Route path="/finance/creditors-recon" element={<CreditorsReconciliation />} />
                 <Route path="/finance/debtors-recon" element={<DebtorsReconciliation />} />
