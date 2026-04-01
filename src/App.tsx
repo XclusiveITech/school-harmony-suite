@@ -35,6 +35,8 @@ import SchoolSettings from "@/pages/admin/SchoolSettings";
 import BankReconciliation from "@/pages/finance/BankReconciliation";
 import CreditorsReconciliation from "@/pages/finance/CreditorsReconciliation";
 import DebtorsReconciliation from "@/pages/finance/DebtorsReconciliation";
+import Creditors from "@/pages/finance/Creditors";
+import Debtors from "@/pages/finance/Debtors";
 import NotFound from "./pages/NotFound";
 import StudentPortalLogin from "./pages/portal/StudentPortalLogin";
 import StudentPortalLayout from "./pages/portal/StudentPortalLayout";
@@ -82,7 +84,8 @@ const App = () => (
                 <Route path="/finance/invoices" element={<Invoices />} />
                 <Route path="/finance/receipts" element={<Receipts />} />
                 <Route path="/finance/currency" element={<CurrencySettings />} />
-                <Route path="/finance/creditors" element={<PlaceholderPage />} />
+                <Route path="/finance/creditors" element={<Creditors />} />
+                <Route path="/finance/debtors" element={<Debtors />} />
                 <Route path="/finance/bank-recon" element={<BankReconciliation />} />
                 <Route path="/finance/creditors-recon" element={<CreditorsReconciliation />} />
                 <Route path="/finance/debtors-recon" element={<DebtorsReconciliation />} />
