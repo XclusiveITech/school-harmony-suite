@@ -35,6 +35,8 @@ import SchoolSettings from "@/pages/admin/SchoolSettings";
 import BankReconciliation from "@/pages/finance/BankReconciliation";
 import CreditorsReconciliation from "@/pages/finance/CreditorsReconciliation";
 import DebtorsReconciliation from "@/pages/finance/DebtorsReconciliation";
+import Creditors from "@/pages/finance/Creditors";
+import Debtors from "@/pages/finance/Debtors";
 import NotFound from "./pages/NotFound";
 import StudentPortalLogin from "./pages/portal/StudentPortalLogin";
 import StudentPortalLayout from "./pages/portal/StudentPortalLayout";
