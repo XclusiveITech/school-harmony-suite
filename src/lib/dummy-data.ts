@@ -235,8 +235,97 @@ export const inventory = [
   { id: '5', name: 'Printer Paper (A4)', category: 'Office Supplies', quantity: 150, warehouse: 'Admin Office', unitCost: 5.00, reorderLevel: 30 },
 ];
 
-export const leaveRequests = [
-  { id: '1', staffId: '5', type: 'Annual', startDate: '2026-03-20', endDate: '2026-03-25', days: 5, reason: 'Family vacation', status: 'Approved' as const },
-  { id: '2', staffId: '1', type: 'Sick', startDate: '2026-03-18', endDate: '2026-03-19', days: 2, reason: 'Medical appointment', status: 'Pending' as const },
-  { id: '3', staffId: '4', type: 'Personal', startDate: '2026-04-01', endDate: '2026-04-02', days: 2, reason: 'Personal matters', status: 'Pending' as const },
+export interface LeaveRequest {
+  id: string;
+  staffId: string;
+  type: 'Annual' | 'Sick' | 'Maternity' | 'Personal' | 'Compassionate';
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason: string;
+  status: 'Approved' | 'Pending' | 'Rejected';
+  paid: boolean;
+}
+
+export const leaveRequests: LeaveRequest[] = [
+  { id: '1', staffId: '5', type: 'Annual', startDate: '2026-03-20', endDate: '2026-03-25', days: 5, reason: 'Family vacation', status: 'Approved', paid: true },
+  { id: '2', staffId: '1', type: 'Sick', startDate: '2026-03-18', endDate: '2026-03-19', days: 2, reason: 'Medical appointment', status: 'Pending', paid: true },
+  { id: '3', staffId: '4', type: 'Personal', startDate: '2026-04-01', endDate: '2026-04-02', days: 2, reason: 'Personal matters', status: 'Pending', paid: false },
+];
+
+export interface LeaveAllocation {
+  staffId: string;
+  annual: number;
+  sick: number;
+  maternity: number;
+  personal: number;
+  compassionate: number;
+  annualUsed: number;
+  sickUsed: number;
+  maternityUsed: number;
+  personalUsed: number;
+  compassionateUsed: number;
+}
+
+export const leaveAllocations: LeaveAllocation[] = [
+  { staffId: '1', annual: 20, sick: 10, maternity: 0, personal: 5, compassionate: 5, annualUsed: 0, sickUsed: 2, maternityUsed: 0, personalUsed: 0, compassionateUsed: 0 },
+  { staffId: '2', annual: 20, sick: 10, maternity: 90, personal: 5, compassionate: 5, annualUsed: 3, sickUsed: 0, maternityUsed: 0, personalUsed: 1, compassionateUsed: 0 },
+  { staffId: '3', annual: 22, sick: 10, maternity: 0, personal: 5, compassionate: 5, annualUsed: 5, sickUsed: 1, maternityUsed: 0, personalUsed: 2, compassionateUsed: 0 },
+  { staffId: '4', annual: 20, sick: 10, maternity: 90, personal: 5, compassionate: 5, annualUsed: 0, sickUsed: 0, maternityUsed: 0, personalUsed: 2, compassionateUsed: 0 },
+  { staffId: '5', annual: 20, sick: 10, maternity: 0, personal: 5, compassionate: 5, annualUsed: 5, sickUsed: 3, maternityUsed: 0, personalUsed: 0, compassionateUsed: 1 },
+];
+
+export interface UserCredential {
+  id: string;
+  staffId: string;
+  email: string;
+  role: string;
+  password: string;
+  lastChanged: string;
+  status: 'Active' | 'Locked' | 'Disabled';
+  mustChangePassword: boolean;
+}
+
+export const userCredentials: UserCredential[] = [
+  { id: '1', staffId: '1', email: 'teacher@brainstar.edu', role: 'teacher', password: 'test123', lastChanged: '2026-01-15', status: 'Active', mustChangePassword: false },
+  { id: '2', staffId: '2', email: 'sarah.ncube@brainstar.edu', role: 'teacher', password: 'test123', lastChanged: '2026-01-15', status: 'Active', mustChangePassword: true },
+  { id: '3', staffId: '3', email: 'hr@brainstar.edu', role: 'hr', password: 'test123', lastChanged: '2026-02-01', status: 'Active', mustChangePassword: false },
+  { id: '4', staffId: '4', email: 'accountant@brainstar.edu', role: 'accountant', password: 'test123', lastChanged: '2026-01-20', status: 'Active', mustChangePassword: false },
+  { id: '5', staffId: '5', email: 'michael.t@brainstar.edu', role: 'teacher', password: 'test123', lastChanged: '2026-01-15', status: 'Active', mustChangePassword: true },
+];
+
+export interface JobPosting {
+  id: string;
+  title: string;
+  department: string;
+  description: string;
+  qualifications: string;
+  deadline: string;
+  status: 'Open' | 'Closed' | 'Filled';
+  datePosted: string;
+  salary?: string;
+}
+
+export const jobPostings: JobPosting[] = [
+  { id: '1', title: 'Mathematics Teacher', department: 'Mathematics', description: 'We are seeking a qualified Mathematics teacher for Form 1-4 classes. The candidate will be responsible for lesson planning, classroom teaching, and continuous assessment.', qualifications: 'Bachelor\'s degree in Mathematics or Education. Teaching certificate required. Minimum 2 years teaching experience.', deadline: '2026-04-30', status: 'Open', datePosted: '2026-03-15', salary: '$1,100 - $1,400/month' },
+  { id: '2', title: 'Science Lab Technician', department: 'Sciences', description: 'Laboratory technician to support Physics, Chemistry, and Biology practical sessions. Responsible for lab maintenance, equipment setup, and safety compliance.', qualifications: 'Diploma in Laboratory Science. Experience with school laboratory equipment preferred.', deadline: '2026-04-20', status: 'Open', datePosted: '2026-03-10', salary: '$800 - $1,000/month' },
+];
+
+export interface JobApplication {
+  id: string;
+  jobId: string;
+  applicantName: string;
+  email: string;
+  phone: string;
+  qualifications: string;
+  experience: string;
+  coverLetter: string;
+  dateApplied: string;
+  status: 'Received' | 'Shortlisted' | 'Interviewed' | 'Offered' | 'Rejected';
+}
+
+export const jobApplications: JobApplication[] = [
+  { id: '1', jobId: '1', applicantName: 'Peter Mugabe', email: 'peter.m@email.com', phone: '+263776001122', qualifications: 'BSc Mathematics, Teaching Diploma', experience: '3 years at Greendale Academy', coverLetter: 'I am excited to apply...', dateApplied: '2026-03-18', status: 'Shortlisted' },
+  { id: '2', jobId: '1', applicantName: 'Grace Hwata', email: 'grace.h@email.com', phone: '+263776334455', qualifications: 'BEd Mathematics', experience: '5 years at St Johns High', coverLetter: 'With my extensive experience...', dateApplied: '2026-03-20', status: 'Received' },
+  { id: '3', jobId: '2', applicantName: 'Tapiwa Chirwa', email: 'tapiwa.c@email.com', phone: '+263776556677', qualifications: 'National Diploma Lab Technology', experience: '2 years at UZ Lab', coverLetter: 'I have hands-on experience...', dateApplied: '2026-03-16', status: 'Interviewed' },
 ];

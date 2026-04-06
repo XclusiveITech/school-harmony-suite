@@ -25,6 +25,9 @@ import FeesStatement from "@/pages/reports/FeesStatement";
 import FeesBalances from "@/pages/reports/FeesBalances";
 import StaffList from "@/pages/hr/StaffList";
 import Payroll from "@/pages/hr/Payroll";
+import Credentials from "@/pages/hr/Credentials";
+import Recruitment from "@/pages/hr/Recruitment";
+import LeaveManagement from "@/pages/hr/LeaveManagement";
 import Assets from "@/pages/Assets";
 import Inventory from "@/pages/Inventory";
 import Subjects from "@/pages/academics/Subjects";
@@ -96,9 +99,10 @@ const App = () => (
                 <Route path="/reports/fees-balances" element={<FeesBalances />} />
                 <Route path="/reports/account-transactions" element={<PlaceholderPage />} />
                 <Route path="/hr/staff" element={<StaffList />} />
-                <Route path="/hr/recruitment" element={<PlaceholderPage />} />
-                <Route path="/hr/leave" element={<PlaceholderPage />} />
+                <Route path="/hr/recruitment" element={<Recruitment />} />
+                <Route path="/hr/leave" element={<LeaveManagement />} />
                 <Route path="/hr/payroll" element={<Payroll />} />
+                <Route path="/hr/credentials" element={<Credentials />} />
                 <Route path="/hr/departments" element={<PlaceholderPage />} />
                 <Route path="/assets" element={<Assets />} />
                 <Route path="/inventory" element={<Inventory />} />
