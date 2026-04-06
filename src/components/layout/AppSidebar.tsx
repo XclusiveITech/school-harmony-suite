@@ -79,6 +79,7 @@ const navItems: NavItem[] = [
       { label: 'Recruitment', path: '/hr/recruitment' },
       { label: 'Leave Management', path: '/hr/leave' },
       { label: 'Payroll', path: '/hr/payroll' },
+      { label: 'Credentials', path: '/hr/credentials' },
       { label: 'Departments', path: '/hr/departments' },
     ]
   },
