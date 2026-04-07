@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { staff, jobPostings, jobApplications, JobPosting, JobApplication } from '@/lib/dummy-data';
 import { Plus, Briefcase, Users, Eye, CheckCircle, XCircle, Clock, FileText, Search } from 'lucide-react';
+import { sendApplicationStatusEmail } from '@/lib/email-notifications';
 
 type Tab = 'staff' | 'jobs' | 'applications';
 
@@ -62,7 +63,12 @@ export default function Recruitment() {
   };
 
   const updateAppStatus = (id: string, status: JobApplication['status']) => {
-    setApplications(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+    setApplications(prev => prev.map(a => {
+      if (a.id !== id) return a;
+      const job = jobs.find(j => j.id === a.jobId);
+      sendApplicationStatusEmail(a.email, a.applicantName, job?.title || 'Unknown Position', status);
+      return { ...a, status };
+    }));
   };
 
   const filteredApps = selectedJob ? applications.filter(a => a.jobId === selectedJob) : applications;
