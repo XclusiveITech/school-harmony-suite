@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { staff, leaveRequests, leaveAllocations, LeaveRequest, LeaveAllocation } from '@/lib/dummy-data';
 import { Plus, Calendar, DollarSign, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { sendLeaveApprovalEmail, sendLeaveRejectionEmail } from '@/lib/email-notifications';
 
 type Tab = 'requests' | 'allocations' | 'payroll';
 
@@ -47,13 +48,19 @@ export default function LeaveManagement() {
   const approveReject = (id: string, status: 'Approved' | 'Rejected') => {
     setRequests(prev => prev.map(r => {
       if (r.id !== id) return r;
-      if (status === 'Approved') {
-        const typeKey = r.type.toLowerCase() as string;
-        const usedKey = `${typeKey}Used` as keyof LeaveAllocation;
-        setAllocations(allocs => allocs.map(a => {
-          if (a.staffId !== r.staffId) return a;
-          return { ...a, [usedKey]: (a[usedKey] as number || 0) + r.days };
-        }));
+      const s = staff.find(st => st.id === r.staffId);
+      if (s) {
+        if (status === 'Approved') {
+          sendLeaveApprovalEmail(s.email, `${s.firstName} ${s.lastName}`, r.type, r.startDate, r.endDate, r.days);
+          const typeKey = r.type.toLowerCase() as string;
+          const usedKey = `${typeKey}Used` as keyof LeaveAllocation;
+          setAllocations(allocs => allocs.map(a => {
+            if (a.staffId !== r.staffId) return a;
+            return { ...a, [usedKey]: (a[usedKey] as number || 0) + r.days };
+          }));
+        } else {
+          sendLeaveRejectionEmail(s.email, `${s.firstName} ${s.lastName}`, r.type, r.startDate, r.endDate);
+        }
       }
       return { ...r, status };
     }));
