@@ -35,6 +35,8 @@ import Classes from "@/pages/academics/Classes";
 import ContinuousAssessment from "@/pages/academics/ContinuousAssessment";
 import PlaceholderPage from "@/pages/PlaceholderPage";
 import SchoolSettings from "@/pages/admin/SchoolSettings";
+import BranchManagement from "@/pages/admin/BranchManagement";
+import CumulativeIncomeStatement from "@/pages/reports/CumulativeIncomeStatement";
 import BankReconciliation from "@/pages/finance/BankReconciliation";
 import CreditorsReconciliation from "@/pages/finance/CreditorsReconciliation";
 import DebtorsReconciliation from "@/pages/finance/DebtorsReconciliation";
@@ -107,8 +109,10 @@ const App = () => (
                 <Route path="/assets" element={<Assets />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/admin/settings" element={<SchoolSettings />} />
+                <Route path="/admin/branches" element={<BranchManagement />} />
                 <Route path="/admin/roles" element={<PlaceholderPage />} />
                 <Route path="/admin/announcements" element={<PlaceholderPage />} />
+                <Route path="/reports/cumulative-income" element={<CumulativeIncomeStatement />} />
               </Route>
               {/* Student Portal */}
               <Route path="/portal/login" element={<StudentPortalLogin />} />

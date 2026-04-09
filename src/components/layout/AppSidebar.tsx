@@ -67,6 +67,7 @@ const navItems: NavItem[] = [
       { label: 'Trial Balance', path: '/reports/trial-balance' },
       { label: 'Balance Sheet', path: '/reports/balance-sheet' },
       { label: 'Income Statement', path: '/reports/income-statement' },
+      { label: 'Cumulative Income (All Branches)', path: '/reports/cumulative-income' },
       { label: 'Fees Statement', path: '/reports/fees-statement' },
       { label: 'Fees Balances', path: '/reports/fees-balances' },
       { label: 'Account Transactions', path: '/reports/account-transactions' },
@@ -90,6 +91,7 @@ const navItems: NavItem[] = [
     roles: ['superadmin', 'admin'],
     children: [
       { label: 'School Settings', path: '/admin/settings' },
+      { label: 'Branch Management', path: '/admin/branches' },
       { label: 'Roles & Permissions', path: '/admin/roles' },
       { label: 'Announcements', path: '/admin/announcements' },
     ]
