@@ -101,6 +101,7 @@ const navItems: NavItem[] = [
 
 export default function AppSidebar() {
   const { user, logout } = useAuth();
+  const { settings } = useSchoolSettings();
   const location = useLocation();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [mobileOpen, setMobileOpen] = useState(false);
