@@ -154,12 +154,72 @@ export const examResults: ExamResult[] = [
   { studentId: '2', subjectId: '1', examType: 'End of Term 1', papers: [{ name: 'Paper 1', mark: 85, possible: 100, weight: 60 }, { name: 'Paper 2', mark: 78, possible: 100, weight: 40 }], percentage: 82.2, comment: 'Outstanding student.' },
 ];
 
-export const homeworks = [
-  { id: '1', subjectId: '1', className: 'Form 3A', title: 'Algebra Practice Set 1', dueDate: '2026-03-20', status: 'Completed', totalMarks: 50 },
-  { id: '2', subjectId: '1', className: 'Form 3A', title: 'Geometry Worksheet', dueDate: '2026-03-25', status: 'Pending', totalMarks: 30 },
-  { id: '3', subjectId: '3', className: 'Form 3A', title: 'Newton Laws Questions', dueDate: '2026-03-22', status: 'Completed', totalMarks: 40 },
-  { id: '4', subjectId: '2', className: 'Form 3A', title: 'Essay Writing', dueDate: '2026-03-28', status: 'Pending', totalMarks: 100 },
+export interface CATask {
+  id: string;
+  subjectId: string;
+  className: string;
+  title: string;
+  description: string;
+  type: 'Homework' | 'In-Class Test' | 'Project';
+  dueDate: string;
+  totalMarks: number;
+  status: 'Published' | 'Draft';
+  attachmentUrl?: string;
+  attachmentName?: string;
+  createdDate: string;
+}
+
+export interface CASubmission {
+  id: string;
+  taskId: string;
+  studentId: string;
+  submittedDate?: string;
+  status: 'Pending' | 'Submitted' | 'Graded';
+  mark?: number;
+  feedback?: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+}
+
+export const caTasks: CATask[] = [
+  { id: '1', subjectId: '1', className: 'Form 3A', title: 'Algebra Practice Set 1', description: 'Complete exercises 1-20 on algebraic expressions', type: 'Homework', dueDate: '2026-03-20', totalMarks: 50, status: 'Published', createdDate: '2026-03-10' },
+  { id: '2', subjectId: '1', className: 'Form 3A', title: 'Geometry Worksheet', description: 'Solve geometry problems on angles and triangles', type: 'Homework', dueDate: '2026-03-25', totalMarks: 30, status: 'Published', createdDate: '2026-03-12' },
+  { id: '3', subjectId: '3', className: 'Form 3A', title: 'Newton Laws Questions', description: 'Answer questions on Newton\'s three laws of motion', type: 'Homework', dueDate: '2026-03-22', totalMarks: 40, status: 'Published', createdDate: '2026-03-11' },
+  { id: '4', subjectId: '2', className: 'Form 3A', title: 'Essay Writing', description: 'Write a 500-word essay on climate change', type: 'Homework', dueDate: '2026-03-28', totalMarks: 100, status: 'Published', createdDate: '2026-03-14' },
+  { id: '5', subjectId: '1', className: 'Form 3A', title: 'Mid-Term Maths Test', description: 'In-class test covering Term 1 topics', type: 'In-Class Test', dueDate: '2026-03-15', totalMarks: 100, status: 'Published', createdDate: '2026-03-08' },
+  { id: '6', subjectId: '3', className: 'Form 3A', title: 'Physics Practical Test', description: 'In-class practical on Ohm\'s Law', type: 'In-Class Test', dueDate: '2026-03-18', totalMarks: 60, status: 'Published', createdDate: '2026-03-10' },
+  { id: '7', subjectId: '4', className: 'Form 3A', title: 'Chemistry Lab Report', description: 'Write a lab report on the titration experiment', type: 'Project', dueDate: '2026-04-05', totalMarks: 80, status: 'Published', createdDate: '2026-03-15' },
+  { id: '8', subjectId: '8', className: 'Form 3A', title: 'Programming Project', description: 'Create a simple calculator program in Python', type: 'Project', dueDate: '2026-04-10', totalMarks: 100, status: 'Published', createdDate: '2026-03-16' },
+  { id: '9', subjectId: '2', className: 'Form 3A', title: 'Comprehension Test', description: 'In-class reading comprehension test', type: 'In-Class Test', dueDate: '2026-03-20', totalMarks: 50, status: 'Published', createdDate: '2026-03-12' },
+  { id: '10', subjectId: '1', className: 'Form 2A', title: 'Fractions Practice', description: 'Practice questions on fractions and decimals', type: 'Homework', dueDate: '2026-03-22', totalMarks: 40, status: 'Published', createdDate: '2026-03-12' },
+  { id: '11', subjectId: '5', className: 'Form 3A', title: 'Biology Field Report', description: 'Document observations from the field trip', type: 'Project', dueDate: '2026-04-08', totalMarks: 60, status: 'Draft', createdDate: '2026-03-18' },
 ];
+
+export const caSubmissions: CASubmission[] = [
+  { id: '1', taskId: '1', studentId: '1', submittedDate: '2026-03-19', status: 'Graded', mark: 42, feedback: 'Good work, minor errors in Q15' },
+  { id: '2', taskId: '1', studentId: '3', submittedDate: '2026-03-20', status: 'Graded', mark: 38, feedback: 'Needs improvement on factoring' },
+  { id: '3', taskId: '2', studentId: '1', status: 'Pending' },
+  { id: '4', taskId: '2', studentId: '3', submittedDate: '2026-03-24', status: 'Submitted' },
+  { id: '5', taskId: '3', studentId: '1', submittedDate: '2026-03-21', status: 'Graded', mark: 35, feedback: 'Excellent understanding of Newton\'s laws' },
+  { id: '6', taskId: '3', studentId: '3', submittedDate: '2026-03-22', status: 'Graded', mark: 30 },
+  { id: '7', taskId: '4', studentId: '1', status: 'Pending' },
+  { id: '8', taskId: '4', studentId: '3', status: 'Pending' },
+  { id: '9', taskId: '5', studentId: '1', submittedDate: '2026-03-15', status: 'Graded', mark: 78, feedback: 'Strong performance' },
+  { id: '10', taskId: '5', studentId: '3', submittedDate: '2026-03-15', status: 'Graded', mark: 65 },
+  { id: '11', taskId: '6', studentId: '1', submittedDate: '2026-03-18', status: 'Graded', mark: 48, feedback: 'Good practical skills' },
+  { id: '12', taskId: '6', studentId: '3', submittedDate: '2026-03-18', status: 'Submitted' },
+  { id: '13', taskId: '7', studentId: '1', status: 'Pending' },
+  { id: '14', taskId: '7', studentId: '3', status: 'Pending' },
+  { id: '15', taskId: '8', studentId: '1', status: 'Pending' },
+  { id: '16', taskId: '9', studentId: '1', submittedDate: '2026-03-20', status: 'Graded', mark: 40, feedback: 'Well done' },
+  { id: '17', taskId: '9', studentId: '3', submittedDate: '2026-03-20', status: 'Graded', mark: 35 },
+];
+
+// Legacy homeworks alias for backward compatibility
+export const homeworks = caTasks.filter(t => t.type === 'Homework').map(t => ({
+  id: t.id, subjectId: t.subjectId, className: t.className, title: t.title,
+  dueDate: t.dueDate, status: t.status === 'Published' ? 'Completed' : 'Pending', totalMarks: t.totalMarks,
+}));
 
 export const announcements = [
   { id: '1', title: 'Term 1 Exams Schedule Released', date: '2026-03-18', content: 'The examination timetable for End of Term 1 has been published. Please check the exams module for details.', priority: 'high' as const },
