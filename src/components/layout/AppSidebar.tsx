@@ -196,9 +196,13 @@ export default function AppSidebar() {
       <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 gradient-sidebar flex flex-col transition-transform lg:translate-x-0 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         {/* Logo */}
         <div className="px-4 py-5 flex items-center gap-3 border-b border-sidebar-border">
-          <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center">
-            <Landmark size={20} className="text-sidebar-primary-foreground" />
-          </div>
+          {settings.logo ? (
+            <img src={settings.logo} alt="Logo" className="w-9 h-9 rounded-lg object-cover" />
+          ) : (
+            <div className="w-9 h-9 rounded-lg gradient-primary flex items-center justify-center">
+              <Landmark size={20} className="text-sidebar-primary-foreground" />
+            </div>
+          )}
           <div>
             <h1 className="font-display text-base font-bold text-sidebar-primary-foreground">Brainstar</h1>
             <p className="text-xs text-sidebar-muted">School Management</p>
