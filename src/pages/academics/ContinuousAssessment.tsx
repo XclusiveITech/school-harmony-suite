@@ -145,7 +145,7 @@ export default function ContinuousAssessment() {
                 </div>
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Status</label>
-                  <Select value={newTask.status} onValueChange={v => setNewTask(p => ({ ...p, status: v }))}>
+                  <Select value={newTask.status} onValueChange={v => setNewTask(p => ({ ...p, status: v as 'Published' | 'Draft' }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Published">Published</SelectItem>
