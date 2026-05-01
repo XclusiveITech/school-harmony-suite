@@ -274,7 +274,7 @@ export function dispatchDeliveryNote(input: {
 }): { ok: boolean; error?: string; ref?: string } {
   // validate stock
   for (const ln of input.lines) {
-    if (allocateFIFO(input.productId ? '' : ln.productId, input.warehouseId, ln.quantity) === null) {
+    if (allocateFIFO(ln.productId, input.warehouseId, ln.quantity) === null) {
       return { ok: false, error: `Insufficient stock for product ${ln.productId}` };
     }
   }
