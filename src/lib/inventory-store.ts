@@ -14,6 +14,9 @@ export type MovementType =
   | 'TRANSFER_IN'      // warehouse transfer (IN side)
   | 'ISSUE'            // internal issuing (OUT)
   | 'ISSUE_RETURN'     // return from issuing (IN)
+  | 'SALE'             // tuckshop POS sale (OUT)
+  | 'SALE_RETURN'      // tuckshop refund (IN)
+  | 'WASTAGE'          // tuckshop wastage (OUT)
   | 'ADJUSTMENT';      // stock-take adjustment
 
 export interface Warehouse {
@@ -137,7 +140,10 @@ const warehouses: Warehouse[] = [
   { id: 'WH1', name: 'Main Store', location: 'Main Branch – Block A' },
   { id: 'WH2', name: 'Science Lab', location: 'Main Branch – Lab Wing' },
   { id: 'WH3', name: 'Admin Office', location: 'Main Branch – Admin' },
+  { id: 'WH-TUCK', name: 'Tuckshop', location: 'Main Branch – Tuckshop POS' },
 ];
+
+export const TUCKSHOP_WAREHOUSE_ID = 'WH-TUCK';
 
 // Map legacy items to products
 const products: Product[] = legacyItems.map((it, idx) => ({
@@ -493,6 +499,85 @@ export function postStockTake(input: {
   }
   postMovements(movs);
   return { ok: true, ref };
+}
+
+export function postSale(input: {
+  date: string; warehouseId: string; ref: string;
+  lines: { productId: string; quantity: number; unitPrice: number }[];
+}): { ok: boolean; error?: string; cogs?: number } {
+  for (const ln of input.lines) {
+    if (allocateFIFO(ln.productId, input.warehouseId, ln.quantity) === null) {
+      return { ok: false, error: `Insufficient stock for product ${ln.productId}` };
+    }
+  }
+  const movs: Omit<StockMovement, 'id'>[] = [];
+  const batchUpdates: { batchId: string; deltaQty: number }[] = [];
+  let cogs = 0;
+  for (const ln of input.lines) {
+    const plan = allocateFIFO(ln.productId, input.warehouseId, ln.quantity)!;
+    for (const p of plan) {
+      batchUpdates.push({ batchId: p.batchId, deltaQty: -p.qty });
+      cogs += p.qty * p.unitCost;
+      movs.push({
+        date: input.date, productId: ln.productId, warehouseId: input.warehouseId,
+        type: 'SALE', quantity: -p.qty, unitCost: p.unitCost,
+        documentType: 'POSReceipt', documentRef: input.ref, batchId: p.batchId,
+      });
+    }
+  }
+  adjustBatches(batchUpdates);
+  postMovements(movs);
+  return { ok: true, cogs };
+}
+
+export function postSaleReturn(input: {
+  date: string; warehouseId: string; ref: string;
+  lines: { productId: string; quantity: number; unitCost: number }[];
+}) {
+  const movs: Omit<StockMovement, 'id'>[] = [];
+  for (const ln of input.lines) {
+    const batch: StockBatch = {
+      id: `B${newId()}`, productId: ln.productId, warehouseId: input.warehouseId,
+      batchNo: `RTN-${input.ref}-${ln.productId}`, receivedDate: input.date,
+      unitCost: ln.unitCost, qtyRemaining: ln.quantity,
+    };
+    addBatch(batch);
+    movs.push({
+      date: input.date, productId: ln.productId, warehouseId: input.warehouseId,
+      type: 'SALE_RETURN', quantity: ln.quantity, unitCost: ln.unitCost,
+      documentType: 'POSRefund', documentRef: input.ref, batchId: batch.id,
+    });
+  }
+  postMovements(movs);
+  return { ok: true };
+}
+
+export function postWastage(input: {
+  date: string; warehouseId: string; ref: string;
+  lines: { productId: string; quantity: number; reason: string }[];
+}): { ok: boolean; error?: string } {
+  for (const ln of input.lines) {
+    if (allocateFIFO(ln.productId, input.warehouseId, ln.quantity) === null) {
+      return { ok: false, error: `Insufficient stock for product ${ln.productId}` };
+    }
+  }
+  const movs: Omit<StockMovement, 'id'>[] = [];
+  const batchUpdates: { batchId: string; deltaQty: number }[] = [];
+  for (const ln of input.lines) {
+    const plan = allocateFIFO(ln.productId, input.warehouseId, ln.quantity)!;
+    for (const p of plan) {
+      batchUpdates.push({ batchId: p.batchId, deltaQty: -p.qty });
+      movs.push({
+        date: input.date, productId: ln.productId, warehouseId: input.warehouseId,
+        type: 'WASTAGE', quantity: -p.qty, unitCost: p.unitCost,
+        documentType: 'Wastage', documentRef: input.ref, batchId: p.batchId,
+        notes: ln.reason,
+      });
+    }
+  }
+  adjustBatches(batchUpdates);
+  postMovements(movs);
+  return { ok: true };
 }
 
 export function addProduct(p: Omit<Product, 'id'>) {
