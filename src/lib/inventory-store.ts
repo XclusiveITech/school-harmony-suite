@@ -14,6 +14,9 @@ export type MovementType =
   | 'TRANSFER_IN'      // warehouse transfer (IN side)
   | 'ISSUE'            // internal issuing (OUT)
   | 'ISSUE_RETURN'     // return from issuing (IN)
+  | 'SALE'             // tuckshop POS sale (OUT)
+  | 'SALE_RETURN'      // tuckshop refund (IN)
+  | 'WASTAGE'          // tuckshop wastage (OUT)
   | 'ADJUSTMENT';      // stock-take adjustment
 
 export interface Warehouse {
