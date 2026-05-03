@@ -493,7 +493,86 @@ export function postStockTake(input: {
         adjustBatches(updates);
         for (const p of plan) {
           movs.push({ date: input.date, productId: ln.productId, warehouseId: input.warehouseId, type: 'ADJUSTMENT', quantity: -p.qty, unitCost: p.unitCost, documentType: 'Adjustment', documentRef: ref, batchId: p.batchId, notes: 'Stock take -' });
-        }
+}
+
+export function postSale(input: {
+  date: string; warehouseId: string; ref: string;
+  lines: { productId: string; quantity: number; unitPrice: number }[];
+}): { ok: boolean; error?: string; cogs?: number } {
+  for (const ln of input.lines) {
+    if (allocateFIFO(ln.productId, input.warehouseId, ln.quantity) === null) {
+      return { ok: false, error: `Insufficient stock for product ${ln.productId}` };
+    }
+  }
+  const movs: Omit<StockMovement, 'id'>[] = [];
+  const batchUpdates: { batchId: string; deltaQty: number }[] = [];
+  let cogs = 0;
+  for (const ln of input.lines) {
+    const plan = allocateFIFO(ln.productId, input.warehouseId, ln.quantity)!;
+    for (const p of plan) {
+      batchUpdates.push({ batchId: p.batchId, deltaQty: -p.qty });
+      cogs += p.qty * p.unitCost;
+      movs.push({
+        date: input.date, productId: ln.productId, warehouseId: input.warehouseId,
+        type: 'SALE', quantity: -p.qty, unitCost: p.unitCost,
+        documentType: 'POSReceipt', documentRef: input.ref, batchId: p.batchId,
+      });
+    }
+  }
+  adjustBatches(batchUpdates);
+  postMovements(movs);
+  return { ok: true, cogs };
+}
+
+export function postSaleReturn(input: {
+  date: string; warehouseId: string; ref: string;
+  lines: { productId: string; quantity: number; unitCost: number }[];
+}) {
+  const movs: Omit<StockMovement, 'id'>[] = [];
+  for (const ln of input.lines) {
+    const batch: StockBatch = {
+      id: `B${newId()}`, productId: ln.productId, warehouseId: input.warehouseId,
+      batchNo: `RTN-${input.ref}-${ln.productId}`, receivedDate: input.date,
+      unitCost: ln.unitCost, qtyRemaining: ln.quantity,
+    };
+    addBatch(batch);
+    movs.push({
+      date: input.date, productId: ln.productId, warehouseId: input.warehouseId,
+      type: 'SALE_RETURN', quantity: ln.quantity, unitCost: ln.unitCost,
+      documentType: 'POSRefund', documentRef: input.ref, batchId: batch.id,
+    });
+  }
+  postMovements(movs);
+  return { ok: true };
+}
+
+export function postWastage(input: {
+  date: string; warehouseId: string; ref: string;
+  lines: { productId: string; quantity: number; reason: string }[];
+}): { ok: boolean; error?: string } {
+  for (const ln of input.lines) {
+    if (allocateFIFO(ln.productId, input.warehouseId, ln.quantity) === null) {
+      return { ok: false, error: `Insufficient stock for product ${ln.productId}` };
+    }
+  }
+  const movs: Omit<StockMovement, 'id'>[] = [];
+  const batchUpdates: { batchId: string; deltaQty: number }[] = [];
+  for (const ln of input.lines) {
+    const plan = allocateFIFO(ln.productId, input.warehouseId, ln.quantity)!;
+    for (const p of plan) {
+      batchUpdates.push({ batchId: p.batchId, deltaQty: -p.qty });
+      movs.push({
+        date: input.date, productId: ln.productId, warehouseId: input.warehouseId,
+        type: 'WASTAGE', quantity: -p.qty, unitCost: p.unitCost,
+        documentType: 'Wastage', documentRef: input.ref, batchId: p.batchId,
+        notes: ln.reason,
+      });
+    }
+  }
+  adjustBatches(batchUpdates);
+  postMovements(movs);
+  return { ok: true };
+}
       }
     }
   }
