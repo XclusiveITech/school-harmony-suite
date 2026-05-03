@@ -658,5 +658,3 @@ function ReportTable({ head, body, onExport }: { head: string[]; body: any[][]; 
   );
 }
 
-// shadow re-import for tuckshop warehouse id usage in reports filter
-const TUCKSHOP_WAREHOUSE_ID = 'WH-TUCK';
