@@ -30,6 +30,7 @@ import Recruitment from "@/pages/hr/Recruitment";
 import LeaveManagement from "@/pages/hr/LeaveManagement";
 import Assets from "@/pages/Assets";
 import Inventory from "@/pages/Inventory";
+import Tuckshop from "@/pages/Tuckshop";
 import Subjects from "@/pages/academics/Subjects";
 import Classes from "@/pages/academics/Classes";
 import ContinuousAssessment from "@/pages/academics/ContinuousAssessment";
