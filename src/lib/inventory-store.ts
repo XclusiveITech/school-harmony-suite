@@ -140,7 +140,10 @@ const warehouses: Warehouse[] = [
   { id: 'WH1', name: 'Main Store', location: 'Main Branch – Block A' },
   { id: 'WH2', name: 'Science Lab', location: 'Main Branch – Lab Wing' },
   { id: 'WH3', name: 'Admin Office', location: 'Main Branch – Admin' },
+  { id: 'WH-TUCK', name: 'Tuckshop', location: 'Main Branch – Tuckshop POS' },
 ];
+
+export const TUCKSHOP_WAREHOUSE_ID = 'WH-TUCK';
 
 // Map legacy items to products
 const products: Product[] = legacyItems.map((it, idx) => ({
