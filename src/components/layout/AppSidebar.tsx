@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, FileText, DollarSign,
   ClipboardList, Settings, LogOut, ChevronDown, ChevronRight, Building2,
   Package, Landmark, UserCog, Calendar, BarChart3, Receipt, CreditCard,
-  Warehouse, TrendingUp, Bell, Menu, X
+  Warehouse, TrendingUp, Bell, Menu, X, ShoppingCart
 } from 'lucide-react';
 
 interface NavItem {
