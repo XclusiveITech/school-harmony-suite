@@ -579,12 +579,6 @@ export function postWastage(input: {
   postMovements(movs);
   return { ok: true };
 }
-      }
-    }
-  }
-  postMovements(movs);
-  return { ok: true, ref };
-}
 
 export function addProduct(p: Omit<Product, 'id'>) {
   set(s => ({ ...s, products: [...s.products, { ...p, id: `P${s.products.length + 1}` }] }));
