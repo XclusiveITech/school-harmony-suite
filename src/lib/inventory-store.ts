@@ -493,6 +493,12 @@ export function postStockTake(input: {
         adjustBatches(updates);
         for (const p of plan) {
           movs.push({ date: input.date, productId: ln.productId, warehouseId: input.warehouseId, type: 'ADJUSTMENT', quantity: -p.qty, unitCost: p.unitCost, documentType: 'Adjustment', documentRef: ref, batchId: p.batchId, notes: 'Stock take -' });
+        }
+      }
+    }
+  }
+  postMovements(movs);
+  return { ok: true, ref };
 }
 
 export function postSale(input: {
