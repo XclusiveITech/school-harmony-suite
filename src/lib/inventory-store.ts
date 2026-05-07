@@ -555,7 +555,7 @@ export function postSaleReturn(input: {
 export function postWastage(input: {
   date: string; warehouseId: string; ref: string;
   lines: { productId: string; quantity: number; reason: string }[];
-}): { ok: boolean; error?: string } {
+}): { ok: boolean; error?: string; cogs?: number } {
   for (const ln of input.lines) {
     if (allocateFIFO(ln.productId, input.warehouseId, ln.quantity) === null) {
       return { ok: false, error: `Insufficient stock for product ${ln.productId}` };
@@ -563,10 +563,12 @@ export function postWastage(input: {
   }
   const movs: Omit<StockMovement, 'id'>[] = [];
   const batchUpdates: { batchId: string; deltaQty: number }[] = [];
+  let cogs = 0;
   for (const ln of input.lines) {
     const plan = allocateFIFO(ln.productId, input.warehouseId, ln.quantity)!;
     for (const p of plan) {
       batchUpdates.push({ batchId: p.batchId, deltaQty: -p.qty });
+      cogs += p.qty * p.unitCost;
       movs.push({
         date: input.date, productId: ln.productId, warehouseId: input.warehouseId,
         type: 'WASTAGE', quantity: -p.qty, unitCost: p.unitCost,
@@ -577,7 +579,7 @@ export function postWastage(input: {
   }
   adjustBatches(batchUpdates);
   postMovements(movs);
-  return { ok: true };
+  return { ok: true, cogs };
 }
 
 export function addProduct(p: Omit<Product, 'id'>) {
