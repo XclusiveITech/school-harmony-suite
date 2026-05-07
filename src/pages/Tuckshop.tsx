@@ -12,6 +12,8 @@ import {
 } from '@/lib/tuckshop-store';
 import { students } from '@/lib/dummy-data';
 import { useAuth } from '@/contexts/AuthContext';
+import { exportCSV as csvExport, exportPDF } from '@/lib/report-export';
+import { useSchoolSettings } from '@/contexts/SchoolSettingsContext';
 
 type TabKey = 'pos' | 'shifts' | 'prices' | 'wastage' | 'dashboard' | 'reports';
 
