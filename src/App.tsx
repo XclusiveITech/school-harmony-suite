@@ -43,6 +43,7 @@ import CreditorsReconciliation from "@/pages/finance/CreditorsReconciliation";
 import DebtorsReconciliation from "@/pages/finance/DebtorsReconciliation";
 import Creditors from "@/pages/finance/Creditors";
 import Debtors from "@/pages/finance/Debtors";
+import TuckshopAccounting from "@/pages/finance/TuckshopAccounting";
 import NotFound from "./pages/NotFound";
 import StudentPortalLogin from "./pages/portal/StudentPortalLogin";
 import StudentPortalLayout from "./pages/portal/StudentPortalLayout";
@@ -95,6 +96,7 @@ const App = () => (
                 <Route path="/finance/bank-recon" element={<BankReconciliation />} />
                 <Route path="/finance/creditors-recon" element={<CreditorsReconciliation />} />
                 <Route path="/finance/debtors-recon" element={<DebtorsReconciliation />} />
+                <Route path="/finance/tuckshop-accounting" element={<TuckshopAccounting />} />
                 <Route path="/reports/trial-balance" element={<TrialBalance />} />
                 <Route path="/reports/balance-sheet" element={<BalanceSheet />} />
                 <Route path="/reports/income-statement" element={<IncomeStatement />} />
