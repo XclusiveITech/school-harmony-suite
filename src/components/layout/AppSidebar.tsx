@@ -60,6 +60,7 @@ const navItems: NavItem[] = [
       { label: 'Bank Reconciliation', path: '/finance/bank-recon' },
       { label: 'Creditors Reconciliation', path: '/finance/creditors-recon' },
       { label: 'Debtors Reconciliation', path: '/finance/debtors-recon' },
+      { label: 'Tuckshop Accounting', path: '/finance/tuckshop-accounting' },
     ]
   },
   {
