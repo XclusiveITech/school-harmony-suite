@@ -31,6 +31,7 @@ import LeaveManagement from "@/pages/hr/LeaveManagement";
 import Assets from "@/pages/Assets";
 import Inventory from "@/pages/Inventory";
 import Tuckshop from "@/pages/Tuckshop";
+import Requisitions from "@/pages/Requisitions";
 import Subjects from "@/pages/academics/Subjects";
 import Classes from "@/pages/academics/Classes";
 import ContinuousAssessment from "@/pages/academics/ContinuousAssessment";
@@ -112,6 +113,7 @@ const App = () => (
                 <Route path="/assets" element={<Assets />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/tuckshop" element={<Tuckshop />} />
+                <Route path="/requisitions" element={<Requisitions />} />
                 <Route path="/admin/settings" element={<SchoolSettings />} />
                 <Route path="/admin/branches" element={<BranchManagement />} />
                 <Route path="/admin/roles" element={<PlaceholderPage />} />
