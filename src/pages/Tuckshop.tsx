@@ -509,7 +509,7 @@ function DashboardTab({ sales, productMap, tuckStock, products }: any) {
 function ReportsTab({ sales, shifts, movements, productMap }: any) {
   const { toast } = useToast();
   const { settings } = useSchoolSettings();
-  const { warehouses } = useInventory(s => ({ warehouses: s.warehouses }));
+  const warehouses = useInventory(s => s.warehouses);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [operatorFilter, setOperatorFilter] = useState('All');

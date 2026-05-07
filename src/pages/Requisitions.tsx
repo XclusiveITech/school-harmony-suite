@@ -30,7 +30,8 @@ export default function Requisitions() {
   const { user } = useAuth();
   const { settings } = useSchoolSettings();
   const requisitions = useRequisitions(s => s.requisitions);
-  const { warehouses, products } = useInventory(s => ({ warehouses: s.warehouses, products: s.products }));
+  const warehouses = useInventory(s => s.warehouses);
+  const products = useInventory(s => s.products);
 
   const [statusFilter, setStatusFilter] = useState<'All' | RequisitionStatus>('All');
   const [search, setSearch] = useState('');
