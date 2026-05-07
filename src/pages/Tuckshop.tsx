@@ -508,39 +508,99 @@ function DashboardTab({ sales, productMap, tuckStock, products }: any) {
 // ---------------- Reports ----------------
 function ReportsTab({ sales, shifts, movements, productMap }: any) {
   const { toast } = useToast();
+  const { settings } = useSchoolSettings();
+  const { warehouses } = useInventory(s => ({ warehouses: s.warehouses }));
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+  const [operatorFilter, setOperatorFilter] = useState('All');
+  const [studentFilter, setStudentFilter] = useState('All');
+  const [warehouseFilter, setWarehouseFilter] = useState<string>(TUCKSHOP_WAREHOUSE_ID);
   const [report, setReport] = useState<'daily' | 'cashup' | 'product' | 'movements' | 'voids' | 'student'>('daily');
   const [voidId, setVoidId] = useState('');
 
-  const inRange = (d: string) => (!from || d >= from) && (!to || d <= to);
-  const filteredSales = sales.filter((s: any) => inRange(s.date.slice(0, 10)));
-  const filteredShifts = shifts.filter((s: any) => inRange(s.openedAt.slice(0, 10)));
-  const filteredMov = movements.filter((m: any) => ['SALE', 'SALE_RETURN', 'WASTAGE'].includes(m.type) && m.warehouseId === TUCKSHOP_WAREHOUSE_ID && inRange(m.date));
+  const operators: string[] = useMemo(() =>
+    Array.from(new Set([...sales.map((s: any) => s.operator), ...shifts.map((s: any) => s.operator)])).filter(Boolean) as string[],
+    [sales, shifts]);
 
-  const exportCSV = (rows: any[][], name: string) => {
-    const csv = rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `${name}.csv`; a.click();
-    URL.revokeObjectURL(url);
+  const studentOpts: { id: string; name: string }[] = useMemo(() => {
+    const map = new Map<string, string>();
+    sales.forEach((s: any) => { if (s.studentId) map.set(s.studentId, s.studentName || s.studentId); });
+    return Array.from(map, ([id, name]) => ({ id, name }));
+  }, [sales]);
+
+  const inRange = (d: string) => (!from || d >= from) && (!to || d <= to);
+  const matchSale = (s: any) =>
+    inRange(s.date.slice(0, 10))
+    && (operatorFilter === 'All' || s.operator === operatorFilter)
+    && (studentFilter === 'All' || s.studentId === studentFilter);
+
+  const filteredSales = sales.filter(matchSale);
+  const filteredShifts = shifts.filter((s: any) =>
+    inRange(s.openedAt.slice(0, 10)) && (operatorFilter === 'All' || s.operator === operatorFilter));
+  const filteredMov = movements.filter((m: any) =>
+    ['SALE', 'SALE_RETURN', 'WASTAGE'].includes(m.type)
+    && m.warehouseId === warehouseFilter
+    && inRange(m.date));
+
+  const reportTitle: Record<string, string> = {
+    daily: 'Daily Sales Summary', cashup: 'Cashup / Shift Reconciliation',
+    product: 'Product Sales', movements: 'Stock Movements (Tuckshop)',
+    voids: 'Voids & Refunds', student: 'Student Purchases',
   };
+
+  const filterMeta = {
+    From: from || undefined, To: to || undefined,
+    Operator: operatorFilter, Student: studentFilter === 'All' ? undefined : (studentOpts.find(s => s.id === studentFilter)?.name ?? studentFilter),
+    Warehouse: report === 'movements' ? (warehouses.find((w: any) => w.id === warehouseFilter)?.name ?? warehouseFilter) : undefined,
+  };
+
+  const subtitle = (from || to) ? `Period: ${from || '...'} to ${to || '...'}` : `As at ${new Date().toLocaleDateString()}`;
+
+  const doExportCSV = (filename: string, head: string[], body: any[][]) => csvExport(filename, head, body);
+  const doExportPDF = (filename: string, head: string[], body: any[][]) =>
+    exportPDF({ filename, title: reportTitle[report], subtitle, filters: filterMeta, head, body, schoolName: settings.name });
 
   return (
     <div className="space-y-4">
-      <div className="bg-card border border-border rounded-xl p-4 flex flex-wrap gap-3 items-end print:hidden">
-        <select value={report} onChange={e => setReport(e.target.value as any)}
-          className="px-3 py-2 rounded-lg border border-input bg-background text-sm">
-          <option value="daily">Daily Sales Summary</option>
-          <option value="cashup">Cashup / Shift Reconciliation</option>
-          <option value="product">Product Sales</option>
-          <option value="movements">Stock Movements (Tuckshop)</option>
-          <option value="voids">Voids & Refunds</option>
-          <option value="student">Student Purchases</option>
-        </select>
-        <div><label className="block text-xs text-muted-foreground">From</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} className="px-3 py-2 rounded-lg border border-input bg-background text-sm" /></div>
-        <div><label className="block text-xs text-muted-foreground">To</label><input type="date" value={to} onChange={e => setTo(e.target.value)} className="px-3 py-2 rounded-lg border border-input bg-background text-sm" /></div>
-        <button onClick={() => window.print()} className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-2"><Printer size={14} /> Print</button>
+      <div className="bg-card border border-border rounded-xl p-4 grid grid-cols-2 md:grid-cols-6 gap-3 items-end print:hidden">
+        <div className="col-span-2 md:col-span-2">
+          <label className="block text-xs text-muted-foreground mb-1">Report</label>
+          <select value={report} onChange={e => setReport(e.target.value as any)} className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm">
+            <option value="daily">Daily Sales Summary</option>
+            <option value="cashup">Cashup / Shift Reconciliation</option>
+            <option value="product">Product Sales</option>
+            <option value="movements">Stock Movements (Tuckshop)</option>
+            <option value="voids">Voids & Refunds</option>
+            <option value="student">Student Purchases</option>
+          </select>
+        </div>
+        <div><label className="block text-xs text-muted-foreground mb-1">From</label><input type="date" value={from} onChange={e => setFrom(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm" /></div>
+        <div><label className="block text-xs text-muted-foreground mb-1">To</label><input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm" /></div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Operator</label>
+          <select value={operatorFilter} onChange={e => setOperatorFilter(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm">
+            <option>All</option>
+            {operators.map(o => <option key={o}>{o}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Student</label>
+          <select value={studentFilter} onChange={e => setStudentFilter(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm">
+            <option value="All">All</option>
+            {studentOpts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </div>
+        {report === 'movements' && (
+          <div className="col-span-2">
+            <label className="block text-xs text-muted-foreground mb-1">Warehouse</label>
+            <select value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm">
+              {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          </div>
+        )}
+        <div className="col-span-2 md:col-span-1 flex justify-end">
+          <button onClick={() => window.print()} className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-2"><Printer size={14} /> Print</button>
+        </div>
       </div>
 
       {report === 'daily' && (() => {
@@ -551,22 +611,18 @@ function ReportsTab({ sales, shifts, movements, productMap }: any) {
           byDay[d].revenue += s.subtotal; byDay[d].cogs += s.cogs; byDay[d].count++;
         });
         const rows = Object.entries(byDay).sort();
-        return (
-          <ReportTable
-            head={['Date', 'Sales', 'Revenue', 'COGS', 'Profit', 'Margin %']}
-            body={rows.map(([d, v]) => [d, v.count, `$${v.revenue.toFixed(2)}`, `$${v.cogs.toFixed(2)}`, `$${(v.revenue - v.cogs).toFixed(2)}`, `${v.revenue ? (((v.revenue - v.cogs) / v.revenue) * 100).toFixed(1) : '0'}%`])}
-            onExport={() => exportCSV([['Date', 'Sales', 'Revenue', 'COGS', 'Profit', 'Margin'], ...rows.map(([d, v]) => [d, v.count, v.revenue, v.cogs, v.revenue - v.cogs, ((v.revenue - v.cogs) / (v.revenue || 1)) * 100])], 'daily-sales')}
-          />
-        );
+        const head = ['Date', 'Sales', 'Revenue', 'COGS', 'Profit', 'Margin %'];
+        const body = rows.map(([d, v]) => [d, v.count, `$${v.revenue.toFixed(2)}`, `$${v.cogs.toFixed(2)}`, `$${(v.revenue - v.cogs).toFixed(2)}`, `${v.revenue ? (((v.revenue - v.cogs) / v.revenue) * 100).toFixed(1) : '0'}%`]);
+        return <ReportTable title={reportTitle.daily} head={head} body={body}
+          onCSV={() => doExportCSV('daily-sales', head, body)} onPDF={() => doExportPDF('daily-sales', head, body)} />;
       })()}
 
-      {report === 'cashup' && (
-        <ReportTable
-          head={['Ref', 'Operator', 'Opened', 'Closed', 'Opening', 'Expected', 'Declared', 'Variance']}
-          body={filteredShifts.map((s: any) => [s.ref, s.operator, new Date(s.openedAt).toLocaleString(), s.closedAt ? new Date(s.closedAt).toLocaleString() : '-', `$${s.openingCash.toFixed(2)}`, s.expectedCash != null ? `$${s.expectedCash.toFixed(2)}` : '-', s.declaredCash != null ? `$${s.declaredCash.toFixed(2)}` : '-', s.variance != null ? `${s.variance >= 0 ? '+' : ''}$${s.variance.toFixed(2)}` : '-'])}
-          onExport={() => exportCSV([['Ref', 'Operator', 'Opened', 'Closed', 'Opening', 'Expected', 'Declared', 'Variance'], ...filteredShifts.map((s: any) => [s.ref, s.operator, s.openedAt, s.closedAt, s.openingCash, s.expectedCash, s.declaredCash, s.variance])], 'cashup-report')}
-        />
-      )}
+      {report === 'cashup' && (() => {
+        const head = ['Ref', 'Operator', 'Opened', 'Closed', 'Opening', 'Expected', 'Declared', 'Variance'];
+        const body = filteredShifts.map((s: any) => [s.ref, s.operator, new Date(s.openedAt).toLocaleString(), s.closedAt ? new Date(s.closedAt).toLocaleString() : '-', `$${s.openingCash.toFixed(2)}`, s.expectedCash != null ? `$${s.expectedCash.toFixed(2)}` : '-', s.declaredCash != null ? `$${s.declaredCash.toFixed(2)}` : '-', s.variance != null ? `${s.variance >= 0 ? '+' : ''}$${s.variance.toFixed(2)}` : '-']);
+        return <ReportTable title={reportTitle.cashup} head={head} body={body}
+          onCSV={() => doExportCSV('cashup-report', head, body)} onPDF={() => doExportPDF('cashup-report', head, body)} />;
+      })()}
 
       {report === 'product' && (() => {
         const map: Record<string, { qty: number; revenue: number; cogs: number }> = {};
@@ -577,38 +633,37 @@ function ReportsTab({ sales, shifts, movements, productMap }: any) {
           map[l.productId].cogs += l.quantity * l.unitCost;
         }));
         const rows = Object.entries(map).sort((a, b) => b[1].revenue - a[1].revenue);
-        return <ReportTable
-          head={['Product', 'Qty Sold', 'Revenue', 'COGS', 'Profit']}
-          body={rows.map(([pid, v]) => [productMap[pid]?.name || pid, v.qty, `$${v.revenue.toFixed(2)}`, `$${v.cogs.toFixed(2)}`, `$${(v.revenue - v.cogs).toFixed(2)}`])}
-          onExport={() => exportCSV([['Product', 'Qty', 'Revenue', 'COGS', 'Profit'], ...rows.map(([pid, v]) => [productMap[pid]?.name || pid, v.qty, v.revenue, v.cogs, v.revenue - v.cogs])], 'product-sales')}
-        />;
+        const head = ['Product', 'Qty Sold', 'Revenue', 'COGS', 'Profit'];
+        const body = rows.map(([pid, v]) => [productMap[pid]?.name || pid, v.qty, `$${v.revenue.toFixed(2)}`, `$${v.cogs.toFixed(2)}`, `$${(v.revenue - v.cogs).toFixed(2)}`]);
+        return <ReportTable title={reportTitle.product} head={head} body={body}
+          onCSV={() => doExportCSV('product-sales', head, body)} onPDF={() => doExportPDF('product-sales', head, body)} />;
       })()}
 
-      {report === 'movements' && (
-        <ReportTable
-          head={['Date', 'Type', 'Product', 'Qty', 'Unit Cost', 'Doc Ref']}
-          body={filteredMov.map((m: any) => [m.date, m.type, productMap[m.productId]?.name || m.productId, m.quantity, `$${m.unitCost.toFixed(2)}`, m.documentRef])}
-          onExport={() => exportCSV([['Date', 'Type', 'Product', 'Qty', 'Unit Cost', 'Doc Ref'], ...filteredMov.map((m: any) => [m.date, m.type, productMap[m.productId]?.name || m.productId, m.quantity, m.unitCost, m.documentRef])], 'tuckshop-movements')}
-        />
-      )}
+      {report === 'movements' && (() => {
+        const head = ['Date', 'Type', 'Product', 'Qty', 'Unit Cost', 'Doc Ref'];
+        const body = filteredMov.map((m: any) => [m.date, m.type, productMap[m.productId]?.name || m.productId, m.quantity, `$${m.unitCost.toFixed(2)}`, m.documentRef]);
+        return <ReportTable title={reportTitle.movements} head={head} body={body}
+          onCSV={() => doExportCSV('tuckshop-movements', head, body)} onPDF={() => doExportPDF('tuckshop-movements', head, body)} />;
+      })()}
 
-      {report === 'voids' && (
-        <>
-          <div className="bg-card border border-border rounded-xl p-3 flex gap-2 items-end print:hidden">
-            <input value={voidId} onChange={e => setVoidId(e.target.value)} placeholder="Sale Ref to void/refund (e.g. S-0001)"
-              className="px-3 py-2 rounded-lg border border-input bg-background text-sm flex-1" />
-            <button onClick={() => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = voidSale(s.id, 'Cancelled at counter'); toast({ title: r.ok ? 'Voided' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
-              className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-1"><X size={14} /> Void</button>
-            <button onClick={() => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = refundSale(s.id, 'Customer refund'); toast({ title: r.ok ? 'Refunded' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
-              className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-1"><RotateCcw size={14} /> Refund</button>
-          </div>
-          <ReportTable
-            head={['Ref', 'Date', 'Operator', 'Status', 'Amount', 'Reason']}
-            body={filteredSales.filter((s: any) => s.status !== 'Completed').map((s: any) => [s.ref, new Date(s.date).toLocaleString(), s.operator, s.status, `$${s.subtotal.toFixed(2)}`, s.voidReason || '-'])}
-            onExport={() => exportCSV([['Ref', 'Date', 'Operator', 'Status', 'Amount', 'Reason'], ...filteredSales.filter((s: any) => s.status !== 'Completed').map((s: any) => [s.ref, s.date, s.operator, s.status, s.subtotal, s.voidReason])], 'voids-refunds')}
-          />
-        </>
-      )}
+      {report === 'voids' && (() => {
+        const head = ['Ref', 'Date', 'Operator', 'Status', 'Amount', 'Reason'];
+        const body = filteredSales.filter((s: any) => s.status !== 'Completed').map((s: any) => [s.ref, new Date(s.date).toLocaleString(), s.operator, s.status, `$${s.subtotal.toFixed(2)}`, s.voidReason || '-']);
+        return (
+          <>
+            <div className="bg-card border border-border rounded-xl p-3 flex gap-2 items-end print:hidden">
+              <input value={voidId} onChange={e => setVoidId(e.target.value)} placeholder="Sale Ref to void/refund (e.g. S-0001)"
+                className="px-3 py-2 rounded-lg border border-input bg-background text-sm flex-1" />
+              <button onClick={() => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = voidSale(s.id, 'Cancelled at counter'); toast({ title: r.ok ? 'Voided' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
+                className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-1"><X size={14} /> Void</button>
+              <button onClick={() => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = refundSale(s.id, 'Customer refund'); toast({ title: r.ok ? 'Refunded' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
+                className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-1"><RotateCcw size={14} /> Refund</button>
+            </div>
+            <ReportTable title={reportTitle.voids} head={head} body={body}
+              onCSV={() => doExportCSV('voids-refunds', head, body)} onPDF={() => doExportPDF('voids-refunds', head, body)} />
+          </>
+        );
+      })()}
 
       {report === 'student' && (() => {
         const map: Record<string, { name: string; total: number; count: number }> = {};
@@ -617,11 +672,10 @@ function ReportsTab({ sales, shifts, movements, productMap }: any) {
           map[s.studentId].total += s.subtotal; map[s.studentId].count++;
         });
         const rows = Object.entries(map).sort((a, b) => b[1].total - a[1].total);
-        return <ReportTable
-          head={['Student', 'Purchases', 'Total Spend']}
-          body={rows.map(([sid, v]) => [v.name, v.count, `$${v.total.toFixed(2)}`])}
-          onExport={() => exportCSV([['Student', 'Purchases', 'Total'], ...rows.map(([sid, v]) => [v.name, v.count, v.total])], 'student-purchases')}
-        />;
+        const head = ['Student', 'Purchases', 'Total Spend'];
+        const body = rows.map(([, v]) => [v.name, v.count, `$${v.total.toFixed(2)}`]);
+        return <ReportTable title={reportTitle.student} head={head} body={body}
+          onCSV={() => doExportCSV('student-purchases', head, body)} onPDF={() => doExportPDF('student-purchases', head, body)} />;
       })()}
     </div>
   );
@@ -636,12 +690,15 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ReportTable({ head, body, onExport }: { head: string[]; body: any[][]; onExport: () => void }) {
+function ReportTable({ title, head, body, onCSV, onPDF }: { title?: string; head: string[]; body: any[][]; onCSV: () => void; onPDF: () => void }) {
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
       <div className="px-4 py-2 border-b border-border flex justify-between items-center print:hidden">
-        <span className="text-sm text-muted-foreground">{body.length} rows</span>
-        <button onClick={onExport} className="px-3 py-1.5 text-xs rounded-lg border border-border">Export CSV</button>
+        <span className="text-sm font-medium text-foreground">{title} <span className="text-muted-foreground font-normal">· {body.length} rows</span></span>
+        <div className="flex gap-2">
+          <button onClick={onCSV} className="px-3 py-1.5 text-xs rounded-lg border border-border">Export CSV</button>
+          <button onClick={onPDF} className="px-3 py-1.5 text-xs rounded-lg gradient-primary text-primary-foreground">Export PDF</button>
+        </div>
       </div>
       <table className="w-full text-sm">
         <thead className="bg-muted/40 text-xs text-muted-foreground">
