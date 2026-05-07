@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, FileText, DollarSign,
   ClipboardList, Settings, LogOut, ChevronDown, ChevronRight, Building2,
   Package, Landmark, UserCog, Calendar, BarChart3, Receipt, CreditCard,
-  Warehouse, TrendingUp, Bell, Menu, X, ShoppingCart
+  Warehouse, TrendingUp, Bell, Menu, X, ShoppingCart, ClipboardCheck
 } from 'lucide-react';
 
 interface NavItem {
@@ -89,6 +89,7 @@ const navItems: NavItem[] = [
   { label: 'Assets', path: '/assets', icon: <Building2 size={20} /> },
   { label: 'Inventory', path: '/inventory', icon: <Package size={20} /> },
   { label: 'Tuckshop', path: '/tuckshop', icon: <ShoppingCart size={20} /> },
+  { label: 'Requisitions', path: '/requisitions', icon: <ClipboardCheck size={20} /> },
   {
     label: 'Administration', icon: <Settings size={20} />,
     roles: ['superadmin', 'admin'],
