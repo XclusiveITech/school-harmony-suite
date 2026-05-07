@@ -178,6 +178,10 @@ export function recordSale(input: {
     status: 'Completed',
   };
   set(s => ({ ...s, sales: [sale, ...s.sales] }));
+  postTuckshopSale({
+    date, saleRef: ref, paymentMethod: input.paymentMethod,
+    amount: subtotal, cogs: result.cogs ?? 0, studentName: input.studentName,
+  });
   return { ok: true, sale };
 }
 
@@ -196,6 +200,10 @@ export function voidSale(saleId: string, reason: string): { ok: boolean; error?:
     ...s,
     sales: s.sales.map(x => x.id === saleId ? { ...x, status: 'Voided', voidReason: reason } : x),
   }));
+  postTuckshopRefund({
+    date: new Date().toISOString(), saleRef: sale.ref, kind: 'Void',
+    paymentMethod: sale.paymentMethod, amount: sale.subtotal, cogs: sale.cogs,
+  });
   return { ok: true };
 }
 
@@ -213,17 +221,31 @@ export function refundSale(saleId: string, reason: string): { ok: boolean; error
     ...s,
     sales: s.sales.map(x => x.id === saleId ? { ...x, status: 'Refunded', voidReason: reason } : x),
   }));
+  postTuckshopRefund({
+    date: new Date().toISOString(), saleRef: sale.ref, kind: 'Refund',
+    paymentMethod: sale.paymentMethod, amount: sale.subtotal, cogs: sale.cogs,
+  });
   return { ok: true };
 }
 
 // ---------- Wastage ----------
 export function recordWastage(input: { lines: { productId: string; quantity: number; reason: string }[] }) {
-  return postWastage({
+  const ref = `WST-${Date.now()}`;
+  const result = postWastage({
     date: new Date().toISOString().slice(0, 10),
     warehouseId: TUCKSHOP_WAREHOUSE_ID,
-    ref: `WST-${Date.now()}`,
+    ref,
     lines: input.lines,
   });
+  if (result.ok) {
+    postTuckshopWastage({
+      date: new Date().toISOString(),
+      ref,
+      cost: result.cogs ?? 0,
+      reason: input.lines.map(l => l.reason).filter(Boolean).join('; '),
+    });
+  }
+  return result;
 }
 
 // ---------- Helpers ----------
