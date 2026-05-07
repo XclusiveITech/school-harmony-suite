@@ -7,6 +7,9 @@ import {
   TUCKSHOP_WAREHOUSE_ID, postSale, postSaleReturn, postWastage,
   getStockOnHand,
 } from './inventory-store';
+import {
+  postTuckshopSale, postTuckshopRefund, postTuckshopWastage,
+} from './accounting-store';
 
 export type PaymentMethod = 'Cash' | 'Student Card' | 'Parent Account';
 export type SaleStatus = 'Completed' | 'Voided' | 'Refunded';
