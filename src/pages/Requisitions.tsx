@@ -685,7 +685,7 @@ function POForm({ suppliers, reqs, onClose, onSave }: { suppliers: Supplier[]; r
   const [paymentTerms, setPaymentTerms] = useState('Net 30');
   const [taxRate, setTaxRate] = useState(15);
   const req = reqs.find(r => r.id === requisitionId);
-  const [lines, setLines] = useState(req?.lines.map(l => ({ id: l.id, description: l.description, unit: l.unit, quantity: l.quantity, unitPrice: l.estimatedCost ?? 0, receivedQty: 0, productId: l.productId })) ?? []);
+  const [lines, setLines] = useState<{ id: string; description: string; unit: string; quantity: number; unitPrice: number; receivedQty: number; productId?: string }[]>(req?.lines.map(l => ({ id: l.id, description: l.description, unit: l.unit, quantity: l.quantity, unitPrice: l.estimatedCost ?? 0, receivedQty: 0, productId: l.productId })) ?? []);
   React.useEffect(() => {
     if (req) setLines(req.lines.map(l => ({ id: l.id, description: l.description, unit: l.unit, quantity: l.quantity, unitPrice: l.estimatedCost ?? 0, receivedQty: 0, productId: l.productId })));
   }, [requisitionId]); // eslint-disable-line
