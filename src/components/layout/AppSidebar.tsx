@@ -76,6 +76,20 @@ const navItems: NavItem[] = [
     ]
   },
   {
+    label: 'Requisitions & Procurement', icon: <ClipboardCheck size={20} />,
+    children: [
+      { label: 'Dashboard', path: '/requisitions#dashboard' },
+      { label: 'Requisitions', path: '/requisitions#requisitions' },
+      { label: 'Approvals', path: '/requisitions#approvals' },
+      { label: 'Suppliers', path: '/requisitions#suppliers' },
+      { label: 'Quotations', path: '/requisitions#quotations' },
+      { label: 'Purchase Orders', path: '/requisitions#purchase-orders' },
+      { label: 'Goods Received', path: '/requisitions#grn' },
+      { label: 'Budgets', path: '/requisitions#budgets' },
+      { label: 'Audit Log', path: '/requisitions#audit' },
+    ]
+  },
+  {
     label: 'HR Management', icon: <UserCog size={20} />,
     children: [
       { label: 'Staff List', path: '/hr/staff' },
@@ -86,10 +100,39 @@ const navItems: NavItem[] = [
       { label: 'Departments', path: '/hr/departments' },
     ]
   },
-  { label: 'Assets', path: '/assets', icon: <Building2 size={20} /> },
-  { label: 'Inventory', path: '/inventory', icon: <Package size={20} /> },
-  { label: 'Tuckshop', path: '/tuckshop', icon: <ShoppingCart size={20} /> },
-  { label: 'Requisitions', path: '/requisitions', icon: <ClipboardCheck size={20} /> },
+  {
+    label: 'Assets', icon: <Building2 size={20} />,
+    children: [
+      { label: 'Asset Register', path: '/assets#register' },
+      { label: 'Asset Assignments', path: '/assets#assignments' },
+      { label: 'Printable Report', path: '/assets#report' },
+    ]
+  },
+  {
+    label: 'Inventory', icon: <Package size={20} />,
+    children: [
+      { label: 'Items', path: '/inventory#items' },
+      { label: 'Delivery Notes', path: '/inventory#delivery' },
+      { label: 'Credit Notes', path: '/inventory#credit' },
+      { label: 'Transfers', path: '/inventory#transfer' },
+      { label: 'Issuing', path: '/inventory#issue' },
+      { label: 'Issue Returns', path: '/inventory#return' },
+      { label: 'Stock Movements', path: '/inventory#movements' },
+      { label: 'Stock Take', path: '/inventory#stocktake' },
+      { label: 'Low Stock', path: '/inventory#alerts' },
+    ]
+  },
+  {
+    label: 'Tuckshop', icon: <ShoppingCart size={20} />,
+    children: [
+      { label: 'POS', path: '/tuckshop#pos' },
+      { label: 'Shifts & Cashup', path: '/tuckshop#shifts' },
+      { label: 'Price List', path: '/tuckshop#prices' },
+      { label: 'Wastage', path: '/tuckshop#wastage' },
+      { label: 'Dashboard', path: '/tuckshop#dashboard' },
+      { label: 'Reports', path: '/tuckshop#reports' },
+    ]
+  },
   {
     label: 'Administration', icon: <Settings size={20} />,
     roles: ['superadmin', 'admin'],
@@ -113,9 +156,21 @@ export default function AppSidebar() {
     setExpanded(prev => ({ ...prev, [label]: !prev[label] }));
   };
 
-  const isActive = (path?: string) => path && location.pathname === path;
+  const isActive = (path?: string) => {
+    if (!path) return false;
+    if (path.includes('#')) {
+      const [base, hash] = path.split('#');
+      return location.pathname === base && location.hash === `#${hash}`;
+    }
+    return location.pathname === path;
+  };
   const isGroupActive = (item: NavItem) =>
-    item.children?.some(c => location.pathname === c.path);
+    item.children?.some(c => {
+      if (c.path.includes('#')) {
+        return location.pathname === c.path.split('#')[0];
+      }
+      return location.pathname === c.path;
+    });
 
   const renderNav = () => (
     <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
