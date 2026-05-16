@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Plus, AlertTriangle, Warehouse as WarehouseIcon, Truck, RotateCcw, ArrowLeftRight,
   PackageOpen, Undo2, ListChecks, Activity, ScanBarcode, Printer, X, Search, FileText
@@ -29,6 +30,11 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 
 export default function Inventory() {
   const [tab, setTab] = useState<TabKey>('items');
+  const location = useLocation();
+  useEffect(() => {
+    const hash = location.hash.replace('#', '') as TabKey;
+    if (TABS.some(t => t.key === hash)) setTab(hash);
+  }, [location.hash]);
   const products    = useInventory(s => s.products);
   const warehouses  = useInventory(s => s.warehouses);
   const movements   = useInventory(s => s.movements);

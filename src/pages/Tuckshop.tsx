@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   ShoppingCart, ScanBarcode, Search, Plus, Minus, X, Printer, Tag,
   PlayCircle, StopCircle, Trash2, AlertTriangle, BarChart3, FileText,
@@ -28,6 +29,11 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
 
 export default function Tuckshop() {
   const [tab, setTab] = useState<TabKey>('pos');
+  const location = useLocation();
+  useEffect(() => {
+    const hash = location.hash.replace('#', '') as TabKey;
+    if (TABS.some(t => t.key === hash)) setTab(hash);
+  }, [location.hash]);
   const { user } = useAuth();
   const operator = user?.name ?? 'Operator';
 
