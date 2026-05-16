@@ -10,6 +10,11 @@ type AssignFilter = 'All' | 'Student' | 'Staff';
 
 export default function Assets() {
   const [tab, setTab] = useState<Tab>('register');
+  const location = useLocation();
+  useEffect(() => {
+    const hash = location.hash.replace('#', '') as Tab;
+    if (['register', 'assignments', 'report'].includes(hash)) setTab(hash);
+  }, [location.hash]);
   const [assetList, setAssetList] = useState<Asset[]>(initialAssets);
   const [assignments, setAssignments] = useState<AssetAssignment[]>(assetAssignments);
   const [showForm, setShowForm] = useState(false);

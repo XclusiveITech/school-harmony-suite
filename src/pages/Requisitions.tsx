@@ -64,6 +64,11 @@ const inputCls = 'w-full px-3 py-2 rounded-lg border border-input bg-background 
 export default function Requisitions() {
   const { user } = useAuth();
   const [tab, setTab] = useState<Tab>('dashboard');
+  const location = useLocation();
+  useEffect(() => {
+    const hash = location.hash.replace('#', '') as Tab;
+    if (TABS.some(t => t.id === hash)) setTab(hash);
+  }, [location.hash]);
 
   return (
     <div className="space-y-5 animate-fade-in">
