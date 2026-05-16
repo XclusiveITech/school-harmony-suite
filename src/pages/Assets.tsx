@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { assets as initialAssets, assetAssignments, students, staff, type AssetAssignment, type Asset } from '@/lib/dummy-data';
 import { Plus, Printer, Search, Edit2, Trash2, Link2, Users, GraduationCap, AlertTriangle, X } from 'lucide-react';
 import ReportHeader from '@/components/ReportHeader';

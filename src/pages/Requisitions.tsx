@@ -1,6 +1,7 @@
 // Enterprise Requisition & Procurement Module
 // Tabs: Dashboard · Requisitions · Approvals · Suppliers · Quotations · Purchase Orders · GRN · Budgets · Audit Log
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   ClipboardList, Plus, Trash2, Send, Check, X, Package, Printer, FileText, Search,
   Building2, Receipt, ShoppingBag, FileCheck2, Wallet, History, AlertTriangle,

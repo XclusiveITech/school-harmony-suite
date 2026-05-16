@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Plus, AlertTriangle, Warehouse as WarehouseIcon, Truck, RotateCcw, ArrowLeftRight,
   PackageOpen, Undo2, ListChecks, Activity, ScanBarcode, Printer, X, Search, FileText

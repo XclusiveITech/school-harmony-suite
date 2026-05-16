@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   ShoppingCart, ScanBarcode, Search, Plus, Minus, X, Printer, Tag,
   PlayCircle, StopCircle, Trash2, AlertTriangle, BarChart3, FileText,
