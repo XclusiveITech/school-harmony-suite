@@ -3,6 +3,7 @@ import { Outlet, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import AppSidebar from './AppSidebar';
 import TopBar from './TopBar';
+import ModuleBreadcrumbs from './ModuleBreadcrumbs';
 
 export default function AppLayout() {
   const { isAuthenticated } = useAuth();
