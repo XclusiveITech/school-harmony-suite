@@ -585,3 +585,201 @@ export default function Assets() {
     </div>
   );
 }
+
+// ============================================================
+// Book Depreciation Panel
+// ============================================================
+function DepreciationPanel({
+  assetList,
+  onApply,
+}: {
+  assetList: Asset[];
+  onApply: (id: string, bookValue: number) => void;
+}) {
+  const currentYear = new Date().getFullYear();
+  const [method, setMethod] = useState<DepreciationMethod>('straight-line');
+  const [asOfYear, setAsOfYear] = useState<number>(currentYear);
+  const [salvagePct, setSalvagePct] = useState<number>(0);
+  const [selectedId, setSelectedId] = useState<string | null>(assetList[0]?.id ?? null);
+
+  const computed = useMemo(
+    () =>
+      assetList.map(a =>
+        buildSchedule(a, method, asOfYear, (a.cost * salvagePct) / 100),
+      ),
+    [assetList, method, asOfYear, salvagePct],
+  );
+
+  const totals = useMemo(() => {
+    return computed.reduce(
+      (acc, r) => {
+        acc.cost += r.asset.cost;
+        acc.accumulated += r.accumulatedDepreciation;
+        acc.book += r.bookValue;
+        acc.period += r.annualDepreciation;
+        return acc;
+      },
+      { cost: 0, accumulated: 0, book: 0, period: 0 },
+    );
+  }, [computed]);
+
+  const selected = computed.find(c => c.asset.id === selectedId) ?? computed[0];
+
+  const inputClass =
+    'w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary';
+
+  const applyAll = () => {
+    computed.forEach(r => onApply(r.asset.id, r.bookValue));
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="bg-card rounded-xl p-5 shadow-card border border-border print:hidden">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">Method</label>
+            <select value={method} onChange={e => setMethod(e.target.value as DepreciationMethod)} className={inputClass}>
+              <option value="straight-line">Straight Line</option>
+              <option value="reducing-balance">Reducing Balance</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">As of Year</label>
+            <input type="number" value={asOfYear} onChange={e => setAsOfYear(Number(e.target.value))} className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">Salvage Value (% of cost)</label>
+            <input type="number" value={salvagePct} onChange={e => setSalvagePct(Number(e.target.value))} className={inputClass} />
+          </div>
+          <div className="flex items-end">
+            <button onClick={applyAll} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg gradient-primary text-primary-foreground font-medium text-sm hover:opacity-90">
+              <Play size={16} /> Post to Register
+            </button>
+          </div>
+          <div className="flex items-end">
+            <button onClick={() => window.print()} className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border text-foreground text-sm hover:bg-muted">
+              <Printer size={16} /> Print Schedules
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-card rounded-xl p-5 shadow-card light-card-blue">
+          <p className="text-sm text-muted-foreground">Total Cost</p>
+          <p className="text-2xl font-display font-bold text-foreground mt-1">${totals.cost.toLocaleString()}</p>
+        </div>
+        <div className="bg-card rounded-xl p-5 shadow-card light-card-orange">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><TrendingDown size={16} /> Accumulated Depreciation</div>
+          <p className="text-2xl font-display font-bold text-warning mt-1">${totals.accumulated.toLocaleString()}</p>
+        </div>
+        <div className="bg-card rounded-xl p-5 shadow-card light-card-green">
+          <p className="text-sm text-muted-foreground">Net Book Value</p>
+          <p className="text-2xl font-display font-bold text-success mt-1">${totals.book.toLocaleString()}</p>
+        </div>
+        <div className="bg-card rounded-xl p-5 shadow-card light-card-purple">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground"><Calculator size={16} /> Period Charge ({asOfYear})</div>
+          <p className="text-2xl font-display font-bold text-card-foreground mt-1">${totals.period.toLocaleString()}</p>
+        </div>
+      </div>
+
+      {/* Printable report wrapper */}
+      <div className="bg-card rounded-xl shadow-card p-6 print:shadow-none print:p-0">
+        <ReportHeader
+          reportTitle="Asset Depreciation Schedule"
+          subtitle={`${method === 'straight-line' ? 'Straight Line' : 'Reducing Balance'} · As of ${asOfYear} · Salvage ${salvagePct}%`}
+        />
+
+        {/* Register-level table */}
+        <table className="w-full text-sm mb-6">
+          <thead>
+            <tr className="border-b-2 border-primary">
+              <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Asset</th>
+              <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Category</th>
+              <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Purchased</th>
+              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Cost</th>
+              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Rate / Life</th>
+              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Period Charge</th>
+              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Accumulated</th>
+              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Book Value</th>
+              <th className="text-center px-3 py-2 text-xs font-medium text-muted-foreground print:hidden">View</th>
+            </tr>
+          </thead>
+          <tbody>
+            {computed.map(r => (
+              <tr key={r.asset.id} className="border-b border-border hover:bg-muted/30">
+                <td className="px-3 py-2 font-medium text-foreground">{r.asset.name}</td>
+                <td className="px-3 py-2 text-muted-foreground">{r.asset.category}</td>
+                <td className="px-3 py-2 text-foreground">{r.asset.purchaseDate}</td>
+                <td className="px-3 py-2 text-right text-foreground">${r.asset.cost.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right text-muted-foreground">{r.asset.depreciationRate}% · {r.usefulLife}y</td>
+                <td className="px-3 py-2 text-right text-warning">${r.annualDepreciation.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right text-foreground">${r.accumulatedDepreciation.toLocaleString()}</td>
+                <td className="px-3 py-2 text-right font-semibold text-success">${r.bookValue.toLocaleString()}</td>
+                <td className="px-3 py-2 text-center print:hidden">
+                  <button
+                    onClick={() => setSelectedId(r.asset.id)}
+                    className={`px-2 py-1 rounded-md text-xs ${selectedId === r.asset.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted/70'}`}
+                  >
+                    Schedule
+                  </button>
+                </td>
+              </tr>
+            ))}
+            <tr className="border-t-2 border-primary font-semibold bg-muted/40">
+              <td className="px-3 py-2" colSpan={3}>Totals</td>
+              <td className="px-3 py-2 text-right">${totals.cost.toLocaleString()}</td>
+              <td className="px-3 py-2"></td>
+              <td className="px-3 py-2 text-right text-warning">${totals.period.toLocaleString()}</td>
+              <td className="px-3 py-2 text-right">${totals.accumulated.toLocaleString()}</td>
+              <td className="px-3 py-2 text-right text-success">${totals.book.toLocaleString()}</td>
+              <td className="print:hidden"></td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* Selected asset schedule */}
+        {selected && (
+          <div className="mt-6">
+            <h4 className="font-display font-semibold text-foreground mb-2">
+              Year-by-Year Schedule — {selected.asset.name}
+            </h4>
+            <p className="text-xs text-muted-foreground mb-3">
+              Purchased {selected.asset.purchaseDate} · Cost ${selected.asset.cost.toLocaleString()} ·
+              Rate {selected.asset.depreciationRate}% · Useful life {selected.usefulLife} years ·
+              Salvage ${selected.salvageValue.toLocaleString()} ·
+              {selected.fullyDepreciated ? ' Fully depreciated' : ` ${selected.yearsHeld} years held`}
+            </p>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-primary">
+                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Year</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Opening</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Depreciation</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Accumulated</th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Closing Book Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selected.schedule.map(row => (
+                  <tr
+                    key={row.year}
+                    className={`border-b border-border ${row.year === asOfYear ? 'bg-primary/5 font-medium' : ''}`}
+                  >
+                    <td className="px-3 py-2 text-foreground">{row.year}{row.year === asOfYear && <span className="ml-2 text-xs text-primary">(current)</span>}</td>
+                    <td className="px-3 py-2 text-right text-foreground">${row.openingValue.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-warning">${row.depreciation.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-foreground">${row.accumulated.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-success">${row.closingValue.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
