@@ -105,6 +105,7 @@ export const navItems: NavItem[] = [
     children: [
       { label: 'Asset Register', path: '/assets#register' },
       { label: 'Asset Assignments', path: '/assets#assignments' },
+      { label: 'Book Depreciation', path: '/assets#depreciation' },
       { label: 'Printable Report', path: '/assets#report' },
     ]
   },
