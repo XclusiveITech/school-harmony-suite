@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { assets as initialAssets, assetAssignments, students, staff, type AssetAssignment, type Asset } from '@/lib/dummy-data';
-import { Plus, Printer, Search, Edit2, Trash2, Link2, Users, GraduationCap, AlertTriangle, X } from 'lucide-react';
+import { Plus, Printer, Search, Edit2, Trash2, Link2, Users, GraduationCap, AlertTriangle, X, TrendingDown, Calculator, Play } from 'lucide-react';
 import ReportHeader from '@/components/ReportHeader';
 import ReportFilters from '@/components/ReportFilters';
+import { buildSchedule, type DepreciationMethod } from '@/lib/depreciation';
 
-type Tab = 'register' | 'assignments' | 'report';
+type Tab = 'register' | 'assignments' | 'depreciation' | 'report';
 type AssignFilter = 'All' | 'Student' | 'Staff';
 
 export default function Assets() {
@@ -13,7 +14,7 @@ export default function Assets() {
   const location = useLocation();
   useEffect(() => {
     const hash = location.hash.replace('#', '') as Tab;
-    if (['register', 'assignments', 'report'].includes(hash)) setTab(hash);
+    if (['register', 'assignments', 'depreciation', 'report'].includes(hash)) setTab(hash);
   }, [location.hash]);
   const [assetList, setAssetList] = useState<Asset[]>(initialAssets);
   const [assignments, setAssignments] = useState<AssetAssignment[]>(assetAssignments);
@@ -128,6 +129,7 @@ export default function Assets() {
   const tabs: { key: Tab; label: string }[] = [
     { key: 'register', label: 'Asset Register' },
     { key: 'assignments', label: 'Asset Assignments' },
+    { key: 'depreciation', label: 'Book Depreciation' },
     { key: 'report', label: 'Printable Report' },
   ];
 
