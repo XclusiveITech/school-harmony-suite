@@ -17,7 +17,7 @@ interface NavItem {
   roles?: string[];
 }
 
-const navItems: NavItem[] = [
+export const navItems: NavItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard size={20} /> },
   {
     label: 'Learners', icon: <GraduationCap size={20} />,
