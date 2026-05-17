@@ -456,6 +456,16 @@ export default function Assets() {
         </div>
       )}
 
+      {/* ========== BOOK DEPRECIATION TAB ========== */}
+      {tab === 'depreciation' && (
+        <DepreciationPanel
+          assetList={assetList}
+          onApply={(id, bookValue) =>
+            setAssetList(prev => prev.map(a => (a.id === id ? { ...a, currentValue: Math.round(bookValue) } : a)))
+          }
+        />
+      )}
+
       {/* ========== PRINTABLE REPORT TAB ========== */}
       {tab === 'report' && (
         <div className="space-y-4">
