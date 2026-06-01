@@ -134,6 +134,7 @@ const App = () => (
                 <Route path="/portal/results" element={<PortalResults />} />
                 <Route path="/portal/notices" element={<PortalNotices />} />
                 <Route path="/portal/profile" element={<PortalProfile />} />
+                <Route path="/portal/online-classes" element={<PortalOnlineClasses />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
