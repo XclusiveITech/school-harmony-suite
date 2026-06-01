@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, FileText, DollarSign,
   ClipboardList, Settings, LogOut, ChevronDown, ChevronRight, Building2,
   Package, Landmark, UserCog, Calendar, BarChart3, Receipt, CreditCard,
-  Warehouse, TrendingUp, Bell, Menu, X, ShoppingCart, ClipboardCheck
+  Warehouse, TrendingUp, Bell, Menu, X, ShoppingCart, ClipboardCheck, Video
 } from 'lucide-react';
 
 interface NavItem {
@@ -46,6 +46,7 @@ export const navItems: NavItem[] = [
       { label: 'Evaluation Reports', path: '/exams/evaluation' },
     ]
   },
+  { label: 'Online Classes', path: '/online-classes', icon: <Video size={20} /> },
   {
     label: 'Finance', icon: <DollarSign size={20} />,
     children: [

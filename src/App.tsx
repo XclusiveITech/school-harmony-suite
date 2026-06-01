@@ -32,6 +32,8 @@ import Assets from "@/pages/Assets";
 import Inventory from "@/pages/Inventory";
 import Tuckshop from "@/pages/Tuckshop";
 import Requisitions from "@/pages/Requisitions";
+import OnlineClasses from "@/pages/OnlineClasses";
+import PortalOnlineClasses from "@/pages/portal/PortalOnlineClasses";
 import Subjects from "@/pages/academics/Subjects";
 import Classes from "@/pages/academics/Classes";
 import ContinuousAssessment from "@/pages/academics/ContinuousAssessment";
@@ -114,6 +116,7 @@ const App = () => (
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/tuckshop" element={<Tuckshop />} />
                 <Route path="/requisitions" element={<Requisitions />} />
+                <Route path="/online-classes" element={<OnlineClasses />} />
                 <Route path="/admin/settings" element={<SchoolSettings />} />
                 <Route path="/admin/branches" element={<BranchManagement />} />
                 <Route path="/admin/roles" element={<PlaceholderPage />} />
@@ -131,6 +134,7 @@ const App = () => (
                 <Route path="/portal/results" element={<PortalResults />} />
                 <Route path="/portal/notices" element={<PortalNotices />} />
                 <Route path="/portal/profile" element={<PortalProfile />} />
+                <Route path="/portal/online-classes" element={<PortalOnlineClasses />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
