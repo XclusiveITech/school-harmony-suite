@@ -116,6 +116,7 @@ const App = () => (
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/tuckshop" element={<Tuckshop />} />
                 <Route path="/requisitions" element={<Requisitions />} />
+                <Route path="/online-classes" element={<OnlineClasses />} />
                 <Route path="/admin/settings" element={<SchoolSettings />} />
                 <Route path="/admin/branches" element={<BranchManagement />} />
                 <Route path="/admin/roles" element={<PlaceholderPage />} />
