@@ -32,6 +32,8 @@ import Assets from "@/pages/Assets";
 import Inventory from "@/pages/Inventory";
 import Tuckshop from "@/pages/Tuckshop";
 import Requisitions from "@/pages/Requisitions";
+import OnlineClasses from "@/pages/OnlineClasses";
+import PortalOnlineClasses from "@/pages/portal/PortalOnlineClasses";
 import Subjects from "@/pages/academics/Subjects";
 import Classes from "@/pages/academics/Classes";
 import ContinuousAssessment from "@/pages/academics/ContinuousAssessment";
