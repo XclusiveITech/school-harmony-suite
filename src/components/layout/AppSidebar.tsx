@@ -46,6 +46,7 @@ export const navItems: NavItem[] = [
       { label: 'Evaluation Reports', path: '/exams/evaluation' },
     ]
   },
+  { label: 'Online Classes', path: '/online-classes', icon: <Video size={20} /> },
   {
     label: 'Finance', icon: <DollarSign size={20} />,
     children: [
