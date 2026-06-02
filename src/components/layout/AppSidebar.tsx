@@ -56,6 +56,7 @@ export const navItems: NavItem[] = [
       { label: 'Invoices', path: '/finance/invoices' },
       { label: 'Receipts', path: '/finance/receipts' },
       { label: 'Currency & Payments', path: '/finance/currency' },
+      { label: 'Fees Structure & Billing', path: '/finance/fees-structure' },
       { label: 'Creditors (AP)', path: '/finance/creditors' },
       { label: 'Debtors (AR)', path: '/finance/debtors' },
       { label: 'Bank Reconciliation', path: '/finance/bank-recon' },
