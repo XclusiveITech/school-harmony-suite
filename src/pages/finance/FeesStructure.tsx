@@ -101,7 +101,7 @@ function StructuresTab({ structures, setStructures, log }: { structures: FeeStru
       approvedAt: undefined,
       approvedBy: undefined,
     };
-    setStructures(p => p.map(x => x.id === s.id ? { ...x, status: 'Archived' } : x).concat(newer));
+    setStructures(p => p.map(x => x.id === s.id ? { ...x, status: 'Archived' as StructureStatus } : x).concat(newer));
     log('Versioned', 'FeeStructure', newer.id, `Created v${newer.version} from ${s.code}`);
     setEditing(newer);
     setShowForm(true);
