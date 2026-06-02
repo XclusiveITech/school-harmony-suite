@@ -18,6 +18,7 @@ import Journals from "@/pages/finance/Journals";
 import Invoices from "@/pages/finance/Invoices";
 import Receipts from "@/pages/finance/Receipts";
 import CurrencySettings from "@/pages/finance/CurrencySettings";
+import FeesStructure from "@/pages/finance/FeesStructure";
 import TrialBalance from "@/pages/reports/TrialBalance";
 import BalanceSheet from "@/pages/reports/BalanceSheet";
 import IncomeStatement from "@/pages/reports/IncomeStatement";
