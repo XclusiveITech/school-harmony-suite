@@ -377,7 +377,7 @@ export default function Transport() {
             </button>
           </div>
           <div className="bg-card border border-border rounded-lg p-6 print:border-0 print:shadow-none">
-            <ReportHeader title="Transport Module — Master Report"
+            <ReportHeader reportTitle="Transport Module — Master Report"
               subtitle={`As at ${new Date().toLocaleDateString()}`} />
             <h3 className="font-semibold mt-4 mb-2">Routes & Fleet</h3>
             <table className="w-full text-sm border border-border mb-4">
