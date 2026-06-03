@@ -1,21 +1,15 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import ReportHeader from '@/components/ReportHeader';
 import ReportFilters from '@/components/ReportFilters';
 import { students } from '@/lib/dummy-data';
+import { initialStructures, structureFullTotal } from '@/lib/fees-structure-store';
 import {
-  Search, Printer, Download, Eye, Check, FileText, Clock, AlertTriangle, Plus
+  Search, Printer, Download, Eye, Check, FileText, Clock, AlertTriangle, Plus, ExternalLink
 } from 'lucide-react';
-
-interface FeeStructure {
-  id: string;
-  level: string;
-  boardingStatus: 'Boarding' | 'Day' | 'All';
-  description: string;
-  amount: number;
-  term: string;
-}
 
 interface StudentInvoice {
   id: string;
