@@ -38,16 +38,6 @@ interface StudentPayment {
   status: 'Processed';
 }
 
-const feeStructures: FeeStructure[] = [
-  { id: 'f1', level: 'Form 1', boardingStatus: 'Day', description: 'Tuition Fees', amount: 900, term: 'Term 1 2026' },
-  { id: 'f2', level: 'Form 1', boardingStatus: 'Boarding', description: 'Tuition + Boarding', amount: 1800, term: 'Term 1 2026' },
-  { id: 'f3', level: 'Form 2', boardingStatus: 'Day', description: 'Tuition Fees', amount: 900, term: 'Term 1 2026' },
-  { id: 'f4', level: 'Form 2', boardingStatus: 'Boarding', description: 'Tuition + Boarding', amount: 1800, term: 'Term 1 2026' },
-  { id: 'f5', level: 'Form 3', boardingStatus: 'Day', description: 'Tuition Fees', amount: 1200, term: 'Term 1 2026' },
-  { id: 'f6', level: 'Form 3', boardingStatus: 'Boarding', description: 'Tuition + Boarding', amount: 2000, term: 'Term 1 2026' },
-  { id: 'f7', level: 'Form 4', boardingStatus: 'Day', description: 'Tuition Fees', amount: 1200, term: 'Term 1 2026' },
-  { id: 'f8', level: 'Form 4', boardingStatus: 'Boarding', description: 'Tuition + Boarding', amount: 2000, term: 'Term 1 2026' },
-];
 
 const initialInvoices: StudentInvoice[] = [
   { id: 'di1', invoiceNumber: 'INV-2026-001', studentId: '1', date: '2026-01-15', dueDate: '2026-02-15', description: 'Term 1 Tuition + Boarding', amount: 2000, paid: 1600, balance: 400, term: 'Term 1 2026', status: 'Partially Paid' },
