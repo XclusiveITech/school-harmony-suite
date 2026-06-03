@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, FileText, DollarSign,
   ClipboardList, Settings, LogOut, ChevronDown, ChevronRight, Building2,
   Package, Landmark, UserCog, Calendar, BarChart3, Receipt, CreditCard,
-  Warehouse, TrendingUp, Bell, Menu, X, ShoppingCart, ClipboardCheck, Video
+  Warehouse, TrendingUp, Bell, Menu, X, ShoppingCart, ClipboardCheck, Video, Bus
 } from 'lucide-react';
 
 interface NavItem {
@@ -123,6 +123,17 @@ export const navItems: NavItem[] = [
       { label: 'Stock Movements', path: '/inventory#movements' },
       { label: 'Stock Take', path: '/inventory#stocktake' },
       { label: 'Low Stock', path: '/inventory#alerts' },
+    ]
+  },
+  {
+    label: 'Transport', icon: <Bus size={20} />,
+    children: [
+      { label: 'Dashboard', path: '/transport#dashboard' },
+      { label: 'Routes & Vehicles', path: '/transport#routes' },
+      { label: 'Student Subscriptions', path: '/transport#subscriptions' },
+      { label: 'Trips Log', path: '/transport#trips' },
+      { label: 'Access Control (Finance)', path: '/transport#access' },
+      { label: 'Printable Report', path: '/transport#report' },
     ]
   },
   {
