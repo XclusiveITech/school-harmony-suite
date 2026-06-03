@@ -1,21 +1,15 @@
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import ReportHeader from '@/components/ReportHeader';
 import ReportFilters from '@/components/ReportFilters';
 import { students } from '@/lib/dummy-data';
+import { initialStructures, structureFullTotal } from '@/lib/fees-structure-store';
 import {
-  Search, Printer, Download, Eye, Check, FileText, Clock, AlertTriangle, Plus
+  Search, Printer, Download, Eye, Check, FileText, Clock, AlertTriangle, Plus, ExternalLink
 } from 'lucide-react';
-
-interface FeeStructure {
-  id: string;
-  level: string;
-  boardingStatus: 'Boarding' | 'Day' | 'All';
-  description: string;
-  amount: number;
-  term: string;
-}
 
 interface StudentInvoice {
   id: string;
@@ -44,16 +38,6 @@ interface StudentPayment {
   status: 'Processed';
 }
 
-const feeStructures: FeeStructure[] = [
-  { id: 'f1', level: 'Form 1', boardingStatus: 'Day', description: 'Tuition Fees', amount: 900, term: 'Term 1 2026' },
-  { id: 'f2', level: 'Form 1', boardingStatus: 'Boarding', description: 'Tuition + Boarding', amount: 1800, term: 'Term 1 2026' },
-  { id: 'f3', level: 'Form 2', boardingStatus: 'Day', description: 'Tuition Fees', amount: 900, term: 'Term 1 2026' },
-  { id: 'f4', level: 'Form 2', boardingStatus: 'Boarding', description: 'Tuition + Boarding', amount: 1800, term: 'Term 1 2026' },
-  { id: 'f5', level: 'Form 3', boardingStatus: 'Day', description: 'Tuition Fees', amount: 1200, term: 'Term 1 2026' },
-  { id: 'f6', level: 'Form 3', boardingStatus: 'Boarding', description: 'Tuition + Boarding', amount: 2000, term: 'Term 1 2026' },
-  { id: 'f7', level: 'Form 4', boardingStatus: 'Day', description: 'Tuition Fees', amount: 1200, term: 'Term 1 2026' },
-  { id: 'f8', level: 'Form 4', boardingStatus: 'Boarding', description: 'Tuition + Boarding', amount: 2000, term: 'Term 1 2026' },
-];
 
 const initialInvoices: StudentInvoice[] = [
   { id: 'di1', invoiceNumber: 'INV-2026-001', studentId: '1', date: '2026-01-15', dueDate: '2026-02-15', description: 'Term 1 Tuition + Boarding', amount: 2000, paid: 1600, balance: 400, term: 'Term 1 2026', status: 'Partially Paid' },
@@ -246,36 +230,78 @@ export default function Debtors() {
 
         {/* FEE STRUCTURE TAB */}
         <TabsContent value="fees" className="space-y-4">
-          <div className="print-area">
-            <ReportHeader reportTitle="Fee Structure" subtitle="Term 1 2026" />
-            <Card>
-              <CardContent className="pt-4">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-muted">
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Level</th>
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Type</th>
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Description</th>
-                      <th className="text-right px-3 py-2 font-medium text-muted-foreground">Amount (USD)</th>
-                      <th className="text-left px-3 py-2 font-medium text-muted-foreground">Term</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {feeStructures.map(f => (
-                      <tr key={f.id} className="border-b border-border hover:bg-muted/50">
-                        <td className="px-3 py-2 font-medium">{f.level}</td>
-                        <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${f.boardingStatus === 'Boarding' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{f.boardingStatus}</span></td>
-                        <td className="px-3 py-2">{f.description}</td>
-                        <td className="px-3 py-2 text-right font-bold">${fmt(f.amount)}</td>
-                        <td className="px-3 py-2">{f.term}</td>
+          <div className="flex justify-between items-center print:hidden">
+            <p className="text-sm text-muted-foreground">
+              Showing approved fee structures from the Fees Structure &amp; Billing module.
+            </p>
+            <Link
+              to="/finance/fees-structure"
+              className={btnOutline}
+            >
+              <ExternalLink size={16} /> Open Fees Structure &amp; Billing
+            </Link>
+          </div>
+          <div className="print-area space-y-4">
+            <ReportHeader reportTitle="Fee Structures" subtitle="From Fees Structure & Billing Engine" />
+            {initialStructures.length === 0 && (
+              <Card><CardContent className="py-6 text-center text-sm text-muted-foreground">
+                No fee structures defined. Create them in Fees Structure &amp; Billing.
+              </CardContent></Card>
+            )}
+            {initialStructures.map(s => (
+              <Card key={s.id}>
+                <CardHeader className="pb-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-base">{s.name}</CardTitle>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {s.code} · v{s.version} · {s.academicYear}
+                        {s.level ? ` · ${s.level}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={s.status === 'Approved' ? 'default' : 'secondary'}>{s.status}</Badge>
+                      <span className="text-sm font-semibold">
+                        Total: {s.currency} ${fmt(structureFullTotal(s))}
+                      </span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted">
+                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">Fee Item</th>
+                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">GL Account</th>
+                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">Cycle</th>
+                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">Applies To</th>
+                        <th className="text-center px-3 py-2 font-medium text-muted-foreground">Mandatory</th>
+                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Amount ({s.currency})</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
+                    </thead>
+                    <tbody>
+                      {s.items.map(it => (
+                        <tr key={it.id} className="border-b border-border hover:bg-muted/50">
+                          <td className="px-3 py-2 font-medium">{it.name}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{it.glAccountCode}</td>
+                          <td className="px-3 py-2">{it.cycle}</td>
+                          <td className="px-3 py-2">{it.appliesTo || 'All'}</td>
+                          <td className="px-3 py-2 text-center">
+                            {it.mandatory
+                              ? <Check size={14} className="inline text-success" />
+                              : <span className="text-xs text-muted-foreground">Optional</span>}
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold">${fmt(it.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </TabsContent>
+
 
         {/* AGING TAB */}
         <TabsContent value="aging" className="space-y-4">
