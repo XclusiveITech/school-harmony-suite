@@ -412,38 +412,217 @@ export default function Transport() {
         </div>
       )}
 
-      {/* TRIPS */}
+      {/* SCHEDULE & TIMETABLE */}
+      {tab === 'schedule' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">Recurring timetables per route with per-stop ETAs.</p>
+            <button onClick={() => openNewSchedule()} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
+              <Plus size={16} /> New Schedule
+            </button>
+          </div>
+          {routes.map(r => {
+            const rs = schedules.filter(s => s.routeId === r.id);
+            return (
+              <div key={r.id} className="bg-card border border-border rounded-lg p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-semibold">{r.code} — {r.name}</h4>
+                  <button onClick={() => openNewSchedule(r.id)} className="text-xs text-primary inline-flex items-center gap-1">
+                    <Plus size={12} /> Add timetable
+                  </button>
+                </div>
+                {rs.length === 0 && <p className="text-xs text-muted-foreground">No schedules.</p>}
+                <div className="grid md:grid-cols-2 gap-3">
+                  {rs.map(s => (
+                    <div key={s.id} className="border border-border rounded-lg p-3 text-xs space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium text-sm flex items-center gap-1">
+                            <Clock size={12} /> {s.direction} · {s.departTime}
+                          </p>
+                          <p className="text-muted-foreground">{s.days.join(', ')}</p>
+                        </div>
+                        <button onClick={() => deleteSchedule(s.id)} className="text-destructive p-1 hover:bg-muted rounded"><Trash2 size={12} /></button>
+                      </div>
+                      <table className="w-full">
+                        <tbody>
+                          {s.stopTimes.map((st, i) => (
+                            <tr key={i} className="border-t border-border/50">
+                              <td className="py-1">{st.stop}</td>
+                              <td className="py-1 text-right font-mono">{st.time}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* TRIPS & BOARDING */}
       {tab === 'trips' && (
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">Trip log records each pickup / dropoff run.</p>
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">Each trip auto-generates student attendance via boarding / dropoff events.</p>
+            <button onClick={openNewTrip} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
+              <Plus size={16} /> New Trip
+            </button>
+          </div>
           <div className="bg-card border border-border rounded-lg overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-left">
                 <tr>
                   <th className="p-3">Date</th><th>Route</th><th>Direction</th>
-                  <th>Vehicle</th><th>Driver</th><th>Attendant</th><th>Odometer</th>
+                  <th>Vehicle</th><th>Driver</th><th>Attendant</th>
+                  <th>Attendance</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {trips.map(t => (
-                  <tr key={t.id} className="border-t border-border">
-                    <td className="p-3">{t.date}</td>
-                    <td>{routeById(t.routeId)?.code}</td>
-                    <td>{t.direction}</td>
-                    <td>{vehicleName(t.vehicleAssetId)}</td>
-                    <td>{staffName(t.driverStaffId)}</td>
-                    <td>{staffName(t.attendantStaffId)}</td>
-                    <td>{t.odometerStart && t.odometerEnd ? `${t.odometerEnd - t.odometerStart} km` : '—'}</td>
+                {trips.map(t => {
+                  const bevs = tripBoardings(t.id);
+                  const boarded = bevs.filter(b => b.action === 'Board' && b.granted).length;
+                  const dropped = bevs.filter(b => b.action === 'Drop').length;
+                  const denied = bevs.filter(b => !b.granted).length;
+                  return (
+                    <tr key={t.id} className="border-t border-border">
+                      <td className="p-3">{t.date}</td>
+                      <td>{routeById(t.routeId)?.code}</td>
+                      <td>{t.direction}</td>
+                      <td>{vehicleName(t.vehicleAssetId)}</td>
+                      <td>{staffName(t.driverStaffId)}</td>
+                      <td>{staffName(t.attendantStaffId)}</td>
+                      <td className="text-xs">
+                        <span className="text-success">{boarded} on</span>
+                        {' · '}<span className="text-info">{dropped} off</span>
+                        {denied > 0 && <> · <span className="text-destructive">{denied} denied</span></>}
+                      </td>
+                      <td>
+                        <button onClick={() => setBoardingTripId(t.id)}
+                          className="px-2 py-1 text-xs rounded bg-primary text-primary-foreground inline-flex items-center gap-1">
+                          <Users size={12} /> Boarding Sheet
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {trips.length === 0 && (
+                  <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No trips logged.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Attendance roll-up */}
+          {boardings.length > 0 && (
+            <div className="bg-card border border-border rounded-lg p-4">
+              <h3 className="font-semibold mb-2 text-sm flex items-center gap-2"><FileText size={14} /> Recent Attendance Events</h3>
+              <table className="w-full text-xs">
+                <thead className="text-left text-muted-foreground">
+                  <tr><th className="p-2">Time</th><th>Student</th><th>Trip</th><th>Stop</th><th>Action</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {[...boardings].slice(-15).reverse().map(b => (
+                    <tr key={b.id} className="border-t border-border/50">
+                      <td className="p-2 font-mono">{new Date(b.time).toLocaleTimeString()}</td>
+                      <td>{studentName(b.studentId)}</td>
+                      <td>{b.tripId}</td>
+                      <td>{b.stop}</td>
+                      <td>{b.action}</td>
+                      <td className={b.granted ? 'text-success' : 'text-destructive'}>
+                        {b.granted ? 'Granted' : 'Denied'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TERM BILLING (links Fees Structure & Billing) */}
+      {tab === 'billing' && (
+        <div className="space-y-4">
+          <div className="bg-info/5 border border-info/30 rounded-lg p-4 text-sm">
+            <p className="font-medium text-info flex items-center gap-2"><DollarSign size={14} /> Linked to Fees Structure & Billing</p>
+            <p className="text-muted-foreground">
+              Generate per-term transport invoices for every active subscription. Invoices are posted to GL{' '}
+              <strong>{TRANSPORT_GL_CODE}</strong> and appear in{' '}
+              <Link to="/finance/fees-structure" className="text-primary underline">Fees Structure & Billing</Link>{' '}
+              and on{' '}
+              <Link to="/finance/debtors" className="text-primary underline">Debtors (AR)</Link>.
+              Marking an invoice paid advances the subscription's access window automatically.
+            </p>
+          </div>
+
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h3 className="font-semibold mb-2 text-sm flex items-center gap-2"><Calendar size={14} /> Run Term Billing</h3>
+            <div className="grid md:grid-cols-3 gap-3">
+              {academicTerms.map(term => {
+                const count = invoices.filter(i => i.termId === term.id).length;
+                return (
+                  <div key={term.id} className="border border-border rounded-lg p-3 space-y-2">
+                    <p className="font-medium">{term.name}</p>
+                    <p className="text-xs text-muted-foreground">{term.startDate} → {term.endDate}</p>
+                    <p className="text-xs">Invoices: <strong>{count}</strong></p>
+                    <button onClick={() => runTermBilling(term.id)}
+                      className="w-full px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground">
+                      Generate Invoices
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-lg overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-left">
+                <tr>
+                  <th className="p-3">Invoice #</th><th>Student</th><th>Route</th>
+                  <th>Term</th><th>Months</th><th>Amount</th>
+                  <th>Due</th><th>Status</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map(inv => (
+                  <tr key={inv.id} className="border-t border-border">
+                    <td className="p-3 font-mono text-xs">{inv.invoiceNumber}</td>
+                    <td>{studentName(inv.studentId)}</td>
+                    <td>{routeById(inv.routeId)?.code}</td>
+                    <td>{inv.termName}</td>
+                    <td>{inv.monthsCovered}</td>
+                    <td>${inv.amount.toFixed(2)}</td>
+                    <td>{inv.dueDate}</td>
+                    <td>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        inv.status === 'Paid' ? 'bg-success/15 text-success' :
+                        inv.status === 'Cancelled' ? 'bg-muted text-muted-foreground' :
+                        'bg-warning/15 text-warning'
+                      }`}>{inv.status}</span>
+                    </td>
+                    <td>
+                      {inv.status === 'Posted' && (
+                        <button onClick={() => markInvoicePaid(inv.id)}
+                          className="px-2 py-1 text-xs rounded bg-success/15 text-success">Mark Paid</button>
+                      )}
+                    </td>
                   </tr>
                 ))}
-                {trips.length === 0 && (
-                  <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No trips logged.</td></tr>
+                {invoices.length === 0 && (
+                  <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">No invoices yet. Run a term billing above.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
       )}
+
+
 
       {/* ACCESS / FINANCE LINK */}
       {tab === 'access' && (
