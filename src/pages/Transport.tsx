@@ -1,24 +1,31 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Bus, Plus, Printer, MapPin, Users, AlertTriangle, CheckCircle2, X, DollarSign, Trash2, Edit2 } from 'lucide-react';
+import { Bus, Plus, Printer, MapPin, Users, AlertTriangle, CheckCircle2, X, DollarSign, Trash2, Edit2, Clock, Calendar, FileText, LogIn, LogOut } from 'lucide-react';
 import { students, staff, assets } from '@/lib/dummy-data';
 import ReportHeader from '@/components/ReportHeader';
 import {
   initialRoutes, initialSubscriptions, initialTrips,
+  initialSchedules, initialBoardingEvents, initialTransportInvoices,
   type TransportRoute, type TransportSubscription, type TransportTrip,
-  currentMonth, deriveStatus, monthsOwed, addMonths, hasAccess,
+  type TransportSchedule, type BoardingEvent, type TransportInvoice, type Weekday,
+  WEEKDAYS, currentMonth, deriveStatus, monthsOwed, addMonths, hasAccess,
+  generateTermInvoice, applyInvoicePayment, dayKey, TRANSPORT_GL_CODE,
 } from '@/lib/transport-store';
+import { academicTerms } from '@/lib/fees-structure-store';
 
-type Tab = 'dashboard' | 'routes' | 'subscriptions' | 'trips' | 'access' | 'report';
+type Tab = 'dashboard' | 'routes' | 'subscriptions' | 'schedule' | 'trips' | 'billing' | 'access' | 'report';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'routes', label: 'Routes & Vehicles' },
-  { id: 'subscriptions', label: 'Student Subscriptions' },
-  { id: 'trips', label: 'Trips Log' },
-  { id: 'access', label: 'Access Control (Finance)' },
+  { id: 'subscriptions', label: 'Subscriptions' },
+  { id: 'schedule', label: 'Schedule & Timetable' },
+  { id: 'trips', label: 'Trips & Boarding' },
+  { id: 'billing', label: 'Term Billing' },
+  { id: 'access', label: 'Access Control' },
   { id: 'report', label: 'Printable Report' },
 ];
+
 
 const statusColors: Record<string, string> = {
   Paid: 'bg-success/15 text-success',
