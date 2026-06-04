@@ -68,10 +68,6 @@ export default function Transport() {
   const [tripForm, setTripForm] = useState<Partial<TransportTrip> & { scheduleId?: string }>({});
 
 
-  // Forms
-  const [showRouteForm, setShowRouteForm] = useState(false);
-  const [editingRoute, setEditingRoute] = useState<string | null>(null);
-  const [routeForm, setRouteForm] = useState<Partial<TransportRoute> & { stopsText?: string }>({});
 
   const [showSubForm, setShowSubForm] = useState(false);
   const [subForm, setSubForm] = useState<Partial<TransportSubscription>>({});
