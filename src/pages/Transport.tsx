@@ -166,6 +166,90 @@ export default function Transport() {
       : { ...s, status: s.status === 'Suspended' ? 'Pending' : 'Suspended' }));
   };
 
+  // ---------- Schedule CRUD ----------
+  const openNewSchedule = (routeId?: string) => {
+    const r = routes.find(x => x.id === (routeId ?? routes[0]?.id));
+    setSchedForm({
+      routeId: r?.id ?? '', direction: 'Pickup', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      departTime: '06:30',
+      stopTimes: (r?.stops ?? []).map(s => ({ stop: s, time: '06:30' })),
+      effectiveFrom: new Date().toISOString().slice(0, 10), active: true,
+    });
+    setShowSchedForm(true);
+  };
+  const saveSchedule = () => {
+    if (!schedForm.routeId || !schedForm.departTime || !(schedForm.days ?? []).length) return;
+    const id = `SCH-${String(schedules.length + 1).padStart(3, '0')}`;
+    setSchedules(prev => [...prev, { id, ...schedForm } as TransportSchedule]);
+    setShowSchedForm(false);
+  };
+  const deleteSchedule = (id: string) => setSchedules(prev => prev.filter(s => s.id !== id));
+
+  // ---------- Trip from Schedule ----------
+  const openNewTrip = () => {
+    const sch = schedules[0];
+    const r = routes.find(x => x.id === sch?.routeId);
+    setTripForm({
+      scheduleId: sch?.id,
+      routeId: r?.id ?? routes[0]?.id ?? '',
+      direction: sch?.direction ?? 'Pickup',
+      date: new Date().toISOString().slice(0, 10),
+      driverStaffId: r?.driverStaffId ?? '',
+      attendantStaffId: r?.attendantStaffId,
+      vehicleAssetId: r?.vehicleAssetId ?? '',
+    });
+    setShowTripForm(true);
+  };
+  const saveTrip = () => {
+    if (!tripForm.routeId || !tripForm.date) return;
+    const id = `TR-${String(trips.length + 1).padStart(3, '0')}`;
+    const newTrip = { id, ...tripForm } as TransportTrip;
+    setTrips(prev => [...prev, newTrip]);
+    setShowTripForm(false);
+    setBoardingTripId(id); // open boarding sheet immediately
+  };
+
+  // ---------- Boarding / Attendance ----------
+  const tripBoardings = (tripId: string) => boardings.filter(b => b.tripId === tripId);
+  const recordBoarding = (trip: TransportTrip, sub: TransportSubscription, action: 'Board' | 'Drop') => {
+    const granted = action === 'Drop' ? true : hasAccess(sub, currentMonth());
+    const reason = !granted ? `Access denied — payment not current (paid through ${sub.paidThroughMonth ?? 'n/a'})` : undefined;
+    const ev: BoardingEvent = {
+      id: `BE-${Date.now()}-${sub.studentId}-${action}`,
+      tripId: trip.id, studentId: sub.studentId, stop: sub.pickupStop,
+      time: new Date().toISOString(), action, granted, reason,
+    };
+    setBoardings(prev => [...prev.filter(b => !(b.tripId === trip.id && b.studentId === sub.studentId && b.action === action)), ev]);
+  };
+
+  // ---------- Term Billing ----------
+  const runTermBilling = (termId: string) => {
+    const term = academicTerms.find(t => t.id === termId);
+    if (!term) return;
+    const newInvoices: TransportInvoice[] = [];
+    subs.forEach((sub, i) => {
+      const route = routes.find(r => r.id === sub.routeId);
+      if (!route) return;
+      const exists = invoices.some(inv => inv.subscriptionId === sub.id && inv.termId === term.id);
+      if (exists) return;
+      newInvoices.push(generateTermInvoice(sub, route, term, invoices.length + i + 1));
+    });
+    if (newInvoices.length === 0) {
+      alert('No new invoices generated (all subscriptions already billed for this term).');
+      return;
+    }
+    setInvoices(prev => [...prev, ...newInvoices]);
+    alert(`${newInvoices.length} invoice(s) posted to Fees Structure & Billing (GL ${TRANSPORT_GL_CODE}).`);
+  };
+  const markInvoicePaid = (invoiceId: string) => {
+    const inv = invoices.find(i => i.id === invoiceId);
+    if (!inv || inv.status === 'Paid') return;
+    setInvoices(prev => prev.map(i => i.id === invoiceId ? { ...i, status: 'Paid', paidAt: new Date().toISOString() } : i));
+    setSubs(prev => prev.map(s => s.id === inv.subscriptionId ? applyInvoicePayment(s, inv) : s));
+  };
+
+
+
   // -------------------------------- UI -------------------------------
   return (
     <div className="p-6 space-y-6">
