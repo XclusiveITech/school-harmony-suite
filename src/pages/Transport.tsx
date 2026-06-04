@@ -800,8 +800,211 @@ export default function Transport() {
         </Modal>
       )}
 
+      {/* Schedule Modal */}
+      {showSchedForm && (
+        <Modal title="New Schedule" onClose={() => setShowSchedForm(false)}>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <Field label="Route">
+              <select className="input" value={schedForm.routeId ?? ''}
+                onChange={e => {
+                  const r = routes.find(x => x.id === e.target.value);
+                  setSchedForm({ ...schedForm, routeId: e.target.value,
+                    stopTimes: (r?.stops ?? []).map(s => ({ stop: s, time: schedForm.departTime ?? '06:30' })) });
+                }}>
+                {routes.map(r => <option key={r.id} value={r.id}>{r.code} — {r.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Direction">
+              <select className="input" value={schedForm.direction ?? 'Pickup'}
+                onChange={e => setSchedForm({ ...schedForm, direction: e.target.value as 'Pickup' | 'Dropoff' })}>
+                <option>Pickup</option><option>Dropoff</option>
+              </select>
+            </Field>
+            <Field label="Depart Time">
+              <input type="time" className="input" value={schedForm.departTime ?? '06:30'}
+                onChange={e => setSchedForm({ ...schedForm, departTime: e.target.value })} />
+            </Field>
+            <Field label="Effective From">
+              <input type="date" className="input" value={schedForm.effectiveFrom ?? ''}
+                onChange={e => setSchedForm({ ...schedForm, effectiveFrom: e.target.value })} />
+            </Field>
+            <Field label="Days" full>
+              <div className="flex flex-wrap gap-1">
+                {WEEKDAYS.map(d => {
+                  const active = (schedForm.days ?? []).includes(d);
+                  return (
+                    <button key={d} type="button"
+                      onClick={() => {
+                        const cur = schedForm.days ?? [];
+                        setSchedForm({ ...schedForm, days: active ? cur.filter(x => x !== d) : [...cur, d] as Weekday[] });
+                      }}
+                      className={`px-3 py-1 text-xs rounded ${active ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+            <Field label="Stop Times" full>
+              <div className="space-y-1">
+                {(schedForm.stopTimes ?? []).map((st, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input className="input flex-1" value={st.stop} readOnly />
+                    <input type="time" className="input w-32" value={st.time}
+                      onChange={e => {
+                        const next = [...(schedForm.stopTimes ?? [])];
+                        next[idx] = { ...next[idx], time: e.target.value };
+                        setSchedForm({ ...schedForm, stopTimes: next });
+                      }} />
+                  </div>
+                ))}
+              </div>
+            </Field>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={() => setShowSchedForm(false)} className="px-4 py-2 rounded-lg border border-border text-sm">Cancel</button>
+            <button onClick={saveSchedule} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Save Schedule</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Trip Modal */}
+      {showTripForm && (
+        <Modal title="New Trip" onClose={() => setShowTripForm(false)}>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <Field label="From Schedule (optional)" full>
+              <select className="input" value={tripForm.scheduleId ?? ''}
+                onChange={e => {
+                  const sch = schedules.find(s => s.id === e.target.value);
+                  const r = routes.find(x => x.id === sch?.routeId);
+                  setTripForm({
+                    ...tripForm, scheduleId: e.target.value,
+                    routeId: sch?.routeId ?? tripForm.routeId,
+                    direction: sch?.direction ?? tripForm.direction,
+                    driverStaffId: r?.driverStaffId ?? tripForm.driverStaffId,
+                    attendantStaffId: r?.attendantStaffId,
+                    vehicleAssetId: r?.vehicleAssetId ?? tripForm.vehicleAssetId,
+                  });
+                }}>
+                <option value="">— ad hoc —</option>
+                {schedules.map(s => {
+                  const r = routes.find(x => x.id === s.routeId);
+                  return <option key={s.id} value={s.id}>{r?.code} · {s.direction} · {s.departTime} ({s.days.join('/')})</option>;
+                })}
+              </select>
+            </Field>
+            <Field label="Route">
+              <select className="input" value={tripForm.routeId ?? ''}
+                onChange={e => {
+                  const r = routes.find(x => x.id === e.target.value);
+                  setTripForm({ ...tripForm, routeId: e.target.value,
+                    driverStaffId: r?.driverStaffId ?? '', vehicleAssetId: r?.vehicleAssetId ?? '' });
+                }}>
+                {routes.map(r => <option key={r.id} value={r.id}>{r.code} — {r.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Direction">
+              <select className="input" value={tripForm.direction ?? 'Pickup'}
+                onChange={e => setTripForm({ ...tripForm, direction: e.target.value as 'Pickup' | 'Dropoff' })}>
+                <option>Pickup</option><option>Dropoff</option>
+              </select>
+            </Field>
+            <Field label="Date">
+              <input type="date" className="input" value={tripForm.date ?? ''}
+                onChange={e => setTripForm({ ...tripForm, date: e.target.value })} />
+            </Field>
+            <Field label="Vehicle">
+              <select className="input" value={tripForm.vehicleAssetId ?? ''}
+                onChange={e => setTripForm({ ...tripForm, vehicleAssetId: e.target.value })}>
+                {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Driver">
+              <select className="input" value={tripForm.driverStaffId ?? ''}
+                onChange={e => setTripForm({ ...tripForm, driverStaffId: e.target.value })}>
+                {(drivers.length ? drivers : allStaff).map(s =>
+                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+              </select>
+            </Field>
+            <Field label="Attendant">
+              <select className="input" value={tripForm.attendantStaffId ?? ''}
+                onChange={e => setTripForm({ ...tripForm, attendantStaffId: e.target.value || undefined })}>
+                <option value="">(optional)</option>
+                {allStaff.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+              </select>
+            </Field>
+            <Field label="Odometer Start">
+              <input type="number" className="input" value={tripForm.odometerStart ?? ''}
+                onChange={e => setTripForm({ ...tripForm, odometerStart: +e.target.value })} />
+            </Field>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={() => setShowTripForm(false)} className="px-4 py-2 rounded-lg border border-border text-sm">Cancel</button>
+            <button onClick={saveTrip} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Start Trip & Open Boarding</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Boarding Sheet */}
+      {boardingTripId && (() => {
+        const trip = trips.find(t => t.id === boardingTripId);
+        if (!trip) return null;
+        const route = routes.find(r => r.id === trip.routeId);
+        const routeSubs = subs.filter(s => s.routeId === trip.routeId);
+        return (
+          <Modal title={`Boarding Sheet — ${route?.code} · ${trip.direction} · ${trip.date}`} onClose={() => setBoardingTripId(null)}>
+            <p className="text-xs text-muted-foreground mb-3">
+              Tap Board / Drop. Boarding is auto-denied for students whose transport fee is not current.
+              Each tap is recorded as an attendance event.
+            </p>
+            <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+              {routeSubs.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">No students subscribed to this route.</p>
+              )}
+              {routeSubs.map(s => {
+                const access = hasAccess(s, currentMonth());
+                const events = boardings.filter(b => b.tripId === trip.id && b.studentId === s.studentId);
+                const onBoard = events.some(b => b.action === 'Board' && b.granted);
+                const offBoard = events.some(b => b.action === 'Drop');
+                return (
+                  <div key={s.id} className="flex items-center justify-between border border-border rounded p-2 text-sm">
+                    <div>
+                      <p className="font-medium">{studentName(s.studentId)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {studentReg(s.studentId)} · {s.pickupStop} ·{' '}
+                        <span className={access ? 'text-success' : 'text-destructive'}>
+                          {access ? 'Access OK' : `Denied (paid: ${s.paidThroughMonth ?? '—'})`}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => recordBoarding(trip, s, 'Board')}
+                        className={`px-2 py-1 text-xs rounded inline-flex items-center gap-1 ${
+                          onBoard ? 'bg-success text-success-foreground' : access ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'
+                        }`}>
+                        <LogIn size={12} /> {onBoard ? 'Boarded' : 'Board'}
+                      </button>
+                      <button onClick={() => recordBoarding(trip, s, 'Drop')}
+                        className={`px-2 py-1 text-xs rounded inline-flex items-center gap-1 ${
+                          offBoard ? 'bg-info text-info-foreground' : 'bg-info/15 text-info'
+                        }`}>
+                        <LogOut size={12} /> {offBoard ? 'Dropped' : 'Drop'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end mt-3">
+              <button onClick={() => setBoardingTripId(null)} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm">Done</button>
+            </div>
+          </Modal>
+        );
+      })()}
+
       <style>{`.input{width:100%;padding:0.5rem 0.75rem;border:1px solid hsl(var(--border));border-radius:0.5rem;background:hsl(var(--background));font-size:0.875rem;}`}</style>
     </div>
+
   );
 }
 
