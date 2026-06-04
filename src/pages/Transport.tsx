@@ -1,24 +1,31 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Bus, Plus, Printer, MapPin, Users, AlertTriangle, CheckCircle2, X, DollarSign, Trash2, Edit2 } from 'lucide-react';
+import { Bus, Plus, Printer, MapPin, Users, AlertTriangle, CheckCircle2, X, DollarSign, Trash2, Edit2, Clock, Calendar, FileText, LogIn, LogOut } from 'lucide-react';
 import { students, staff, assets } from '@/lib/dummy-data';
 import ReportHeader from '@/components/ReportHeader';
 import {
   initialRoutes, initialSubscriptions, initialTrips,
+  initialSchedules, initialBoardingEvents, initialTransportInvoices,
   type TransportRoute, type TransportSubscription, type TransportTrip,
-  currentMonth, deriveStatus, monthsOwed, addMonths, hasAccess,
+  type TransportSchedule, type BoardingEvent, type TransportInvoice, type Weekday,
+  WEEKDAYS, currentMonth, deriveStatus, monthsOwed, addMonths, hasAccess,
+  generateTermInvoice, applyInvoicePayment, dayKey, TRANSPORT_GL_CODE,
 } from '@/lib/transport-store';
+import { academicTerms } from '@/lib/fees-structure-store';
 
-type Tab = 'dashboard' | 'routes' | 'subscriptions' | 'trips' | 'access' | 'report';
+type Tab = 'dashboard' | 'routes' | 'subscriptions' | 'schedule' | 'trips' | 'billing' | 'access' | 'report';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'routes', label: 'Routes & Vehicles' },
-  { id: 'subscriptions', label: 'Student Subscriptions' },
-  { id: 'trips', label: 'Trips Log' },
-  { id: 'access', label: 'Access Control (Finance)' },
+  { id: 'subscriptions', label: 'Subscriptions' },
+  { id: 'schedule', label: 'Schedule & Timetable' },
+  { id: 'trips', label: 'Trips & Boarding' },
+  { id: 'billing', label: 'Term Billing' },
+  { id: 'access', label: 'Access Control' },
   { id: 'report', label: 'Printable Report' },
 ];
+
 
 const statusColors: Record<string, string> = {
   Paid: 'bg-success/15 text-success',
@@ -38,6 +45,9 @@ export default function Transport() {
   const [routes, setRoutes] = useState<TransportRoute[]>(initialRoutes);
   const [subs, setSubs] = useState<TransportSubscription[]>(initialSubscriptions);
   const [trips, setTrips] = useState<TransportTrip[]>(initialTrips);
+  const [schedules, setSchedules] = useState<TransportSchedule[]>(initialSchedules);
+  const [boardings, setBoardings] = useState<BoardingEvent[]>(initialBoardingEvents);
+  const [invoices, setInvoices] = useState<TransportInvoice[]>(initialTransportInvoices);
 
   const vehicles = useMemo(() => assets.filter(a => a.category === 'Vehicles'), []);
   const drivers = useMemo(
@@ -50,6 +60,14 @@ export default function Transport() {
   const [showRouteForm, setShowRouteForm] = useState(false);
   const [editingRoute, setEditingRoute] = useState<string | null>(null);
   const [routeForm, setRouteForm] = useState<Partial<TransportRoute> & { stopsText?: string }>({});
+
+  const [showSchedForm, setShowSchedForm] = useState(false);
+  const [schedForm, setSchedForm] = useState<Partial<TransportSchedule>>({});
+  const [boardingTripId, setBoardingTripId] = useState<string | null>(null);
+  const [showTripForm, setShowTripForm] = useState(false);
+  const [tripForm, setTripForm] = useState<Partial<TransportTrip> & { scheduleId?: string }>({});
+
+
 
   const [showSubForm, setShowSubForm] = useState(false);
   const [subForm, setSubForm] = useState<Partial<TransportSubscription>>({});
@@ -147,6 +165,90 @@ export default function Transport() {
     setSubs(prev => prev.map(s => s.id !== id ? s
       : { ...s, status: s.status === 'Suspended' ? 'Pending' : 'Suspended' }));
   };
+
+  // ---------- Schedule CRUD ----------
+  const openNewSchedule = (routeId?: string) => {
+    const r = routes.find(x => x.id === (routeId ?? routes[0]?.id));
+    setSchedForm({
+      routeId: r?.id ?? '', direction: 'Pickup', days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      departTime: '06:30',
+      stopTimes: (r?.stops ?? []).map(s => ({ stop: s, time: '06:30' })),
+      effectiveFrom: new Date().toISOString().slice(0, 10), active: true,
+    });
+    setShowSchedForm(true);
+  };
+  const saveSchedule = () => {
+    if (!schedForm.routeId || !schedForm.departTime || !(schedForm.days ?? []).length) return;
+    const id = `SCH-${String(schedules.length + 1).padStart(3, '0')}`;
+    setSchedules(prev => [...prev, { id, ...schedForm } as TransportSchedule]);
+    setShowSchedForm(false);
+  };
+  const deleteSchedule = (id: string) => setSchedules(prev => prev.filter(s => s.id !== id));
+
+  // ---------- Trip from Schedule ----------
+  const openNewTrip = () => {
+    const sch = schedules[0];
+    const r = routes.find(x => x.id === sch?.routeId);
+    setTripForm({
+      scheduleId: sch?.id,
+      routeId: r?.id ?? routes[0]?.id ?? '',
+      direction: sch?.direction ?? 'Pickup',
+      date: new Date().toISOString().slice(0, 10),
+      driverStaffId: r?.driverStaffId ?? '',
+      attendantStaffId: r?.attendantStaffId,
+      vehicleAssetId: r?.vehicleAssetId ?? '',
+    });
+    setShowTripForm(true);
+  };
+  const saveTrip = () => {
+    if (!tripForm.routeId || !tripForm.date) return;
+    const id = `TR-${String(trips.length + 1).padStart(3, '0')}`;
+    const newTrip = { id, ...tripForm } as TransportTrip;
+    setTrips(prev => [...prev, newTrip]);
+    setShowTripForm(false);
+    setBoardingTripId(id); // open boarding sheet immediately
+  };
+
+  // ---------- Boarding / Attendance ----------
+  const tripBoardings = (tripId: string) => boardings.filter(b => b.tripId === tripId);
+  const recordBoarding = (trip: TransportTrip, sub: TransportSubscription, action: 'Board' | 'Drop') => {
+    const granted = action === 'Drop' ? true : hasAccess(sub, currentMonth());
+    const reason = !granted ? `Access denied — payment not current (paid through ${sub.paidThroughMonth ?? 'n/a'})` : undefined;
+    const ev: BoardingEvent = {
+      id: `BE-${Date.now()}-${sub.studentId}-${action}`,
+      tripId: trip.id, studentId: sub.studentId, stop: sub.pickupStop,
+      time: new Date().toISOString(), action, granted, reason,
+    };
+    setBoardings(prev => [...prev.filter(b => !(b.tripId === trip.id && b.studentId === sub.studentId && b.action === action)), ev]);
+  };
+
+  // ---------- Term Billing ----------
+  const runTermBilling = (termId: string) => {
+    const term = academicTerms.find(t => t.id === termId);
+    if (!term) return;
+    const newInvoices: TransportInvoice[] = [];
+    subs.forEach((sub, i) => {
+      const route = routes.find(r => r.id === sub.routeId);
+      if (!route) return;
+      const exists = invoices.some(inv => inv.subscriptionId === sub.id && inv.termId === term.id);
+      if (exists) return;
+      newInvoices.push(generateTermInvoice(sub, route, term, invoices.length + i + 1));
+    });
+    if (newInvoices.length === 0) {
+      alert('No new invoices generated (all subscriptions already billed for this term).');
+      return;
+    }
+    setInvoices(prev => [...prev, ...newInvoices]);
+    alert(`${newInvoices.length} invoice(s) posted to Fees Structure & Billing (GL ${TRANSPORT_GL_CODE}).`);
+  };
+  const markInvoicePaid = (invoiceId: string) => {
+    const inv = invoices.find(i => i.id === invoiceId);
+    if (!inv || inv.status === 'Paid') return;
+    setInvoices(prev => prev.map(i => i.id === invoiceId ? { ...i, status: 'Paid', paidAt: new Date().toISOString() } : i));
+    setSubs(prev => prev.map(s => s.id === inv.subscriptionId ? applyInvoicePayment(s, inv) : s));
+  };
+
+
 
   // -------------------------------- UI -------------------------------
   return (
@@ -310,38 +412,217 @@ export default function Transport() {
         </div>
       )}
 
-      {/* TRIPS */}
+      {/* SCHEDULE & TIMETABLE */}
+      {tab === 'schedule' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">Recurring timetables per route with per-stop ETAs.</p>
+            <button onClick={() => openNewSchedule()} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
+              <Plus size={16} /> New Schedule
+            </button>
+          </div>
+          {routes.map(r => {
+            const rs = schedules.filter(s => s.routeId === r.id);
+            return (
+              <div key={r.id} className="bg-card border border-border rounded-lg p-4">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-semibold">{r.code} — {r.name}</h4>
+                  <button onClick={() => openNewSchedule(r.id)} className="text-xs text-primary inline-flex items-center gap-1">
+                    <Plus size={12} /> Add timetable
+                  </button>
+                </div>
+                {rs.length === 0 && <p className="text-xs text-muted-foreground">No schedules.</p>}
+                <div className="grid md:grid-cols-2 gap-3">
+                  {rs.map(s => (
+                    <div key={s.id} className="border border-border rounded-lg p-3 text-xs space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium text-sm flex items-center gap-1">
+                            <Clock size={12} /> {s.direction} · {s.departTime}
+                          </p>
+                          <p className="text-muted-foreground">{s.days.join(', ')}</p>
+                        </div>
+                        <button onClick={() => deleteSchedule(s.id)} className="text-destructive p-1 hover:bg-muted rounded"><Trash2 size={12} /></button>
+                      </div>
+                      <table className="w-full">
+                        <tbody>
+                          {s.stopTimes.map((st, i) => (
+                            <tr key={i} className="border-t border-border/50">
+                              <td className="py-1">{st.stop}</td>
+                              <td className="py-1 text-right font-mono">{st.time}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* TRIPS & BOARDING */}
       {tab === 'trips' && (
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">Trip log records each pickup / dropoff run.</p>
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-muted-foreground">Each trip auto-generates student attendance via boarding / dropoff events.</p>
+            <button onClick={openNewTrip} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
+              <Plus size={16} /> New Trip
+            </button>
+          </div>
           <div className="bg-card border border-border rounded-lg overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 text-left">
                 <tr>
                   <th className="p-3">Date</th><th>Route</th><th>Direction</th>
-                  <th>Vehicle</th><th>Driver</th><th>Attendant</th><th>Odometer</th>
+                  <th>Vehicle</th><th>Driver</th><th>Attendant</th>
+                  <th>Attendance</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {trips.map(t => (
-                  <tr key={t.id} className="border-t border-border">
-                    <td className="p-3">{t.date}</td>
-                    <td>{routeById(t.routeId)?.code}</td>
-                    <td>{t.direction}</td>
-                    <td>{vehicleName(t.vehicleAssetId)}</td>
-                    <td>{staffName(t.driverStaffId)}</td>
-                    <td>{staffName(t.attendantStaffId)}</td>
-                    <td>{t.odometerStart && t.odometerEnd ? `${t.odometerEnd - t.odometerStart} km` : '—'}</td>
+                {trips.map(t => {
+                  const bevs = tripBoardings(t.id);
+                  const boarded = bevs.filter(b => b.action === 'Board' && b.granted).length;
+                  const dropped = bevs.filter(b => b.action === 'Drop').length;
+                  const denied = bevs.filter(b => !b.granted).length;
+                  return (
+                    <tr key={t.id} className="border-t border-border">
+                      <td className="p-3">{t.date}</td>
+                      <td>{routeById(t.routeId)?.code}</td>
+                      <td>{t.direction}</td>
+                      <td>{vehicleName(t.vehicleAssetId)}</td>
+                      <td>{staffName(t.driverStaffId)}</td>
+                      <td>{staffName(t.attendantStaffId)}</td>
+                      <td className="text-xs">
+                        <span className="text-success">{boarded} on</span>
+                        {' · '}<span className="text-info">{dropped} off</span>
+                        {denied > 0 && <> · <span className="text-destructive">{denied} denied</span></>}
+                      </td>
+                      <td>
+                        <button onClick={() => setBoardingTripId(t.id)}
+                          className="px-2 py-1 text-xs rounded bg-primary text-primary-foreground inline-flex items-center gap-1">
+                          <Users size={12} /> Boarding Sheet
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {trips.length === 0 && (
+                  <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No trips logged.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Attendance roll-up */}
+          {boardings.length > 0 && (
+            <div className="bg-card border border-border rounded-lg p-4">
+              <h3 className="font-semibold mb-2 text-sm flex items-center gap-2"><FileText size={14} /> Recent Attendance Events</h3>
+              <table className="w-full text-xs">
+                <thead className="text-left text-muted-foreground">
+                  <tr><th className="p-2">Time</th><th>Student</th><th>Trip</th><th>Stop</th><th>Action</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {[...boardings].slice(-15).reverse().map(b => (
+                    <tr key={b.id} className="border-t border-border/50">
+                      <td className="p-2 font-mono">{new Date(b.time).toLocaleTimeString()}</td>
+                      <td>{studentName(b.studentId)}</td>
+                      <td>{b.tripId}</td>
+                      <td>{b.stop}</td>
+                      <td>{b.action}</td>
+                      <td className={b.granted ? 'text-success' : 'text-destructive'}>
+                        {b.granted ? 'Granted' : 'Denied'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TERM BILLING (links Fees Structure & Billing) */}
+      {tab === 'billing' && (
+        <div className="space-y-4">
+          <div className="bg-info/5 border border-info/30 rounded-lg p-4 text-sm">
+            <p className="font-medium text-info flex items-center gap-2"><DollarSign size={14} /> Linked to Fees Structure & Billing</p>
+            <p className="text-muted-foreground">
+              Generate per-term transport invoices for every active subscription. Invoices are posted to GL{' '}
+              <strong>{TRANSPORT_GL_CODE}</strong> and appear in{' '}
+              <Link to="/finance/fees-structure" className="text-primary underline">Fees Structure & Billing</Link>{' '}
+              and on{' '}
+              <Link to="/finance/debtors" className="text-primary underline">Debtors (AR)</Link>.
+              Marking an invoice paid advances the subscription's access window automatically.
+            </p>
+          </div>
+
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h3 className="font-semibold mb-2 text-sm flex items-center gap-2"><Calendar size={14} /> Run Term Billing</h3>
+            <div className="grid md:grid-cols-3 gap-3">
+              {academicTerms.map(term => {
+                const count = invoices.filter(i => i.termId === term.id).length;
+                return (
+                  <div key={term.id} className="border border-border rounded-lg p-3 space-y-2">
+                    <p className="font-medium">{term.name}</p>
+                    <p className="text-xs text-muted-foreground">{term.startDate} → {term.endDate}</p>
+                    <p className="text-xs">Invoices: <strong>{count}</strong></p>
+                    <button onClick={() => runTermBilling(term.id)}
+                      className="w-full px-3 py-1.5 text-xs rounded bg-primary text-primary-foreground">
+                      Generate Invoices
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="bg-card border border-border rounded-lg overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/50 text-left">
+                <tr>
+                  <th className="p-3">Invoice #</th><th>Student</th><th>Route</th>
+                  <th>Term</th><th>Months</th><th>Amount</th>
+                  <th>Due</th><th>Status</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map(inv => (
+                  <tr key={inv.id} className="border-t border-border">
+                    <td className="p-3 font-mono text-xs">{inv.invoiceNumber}</td>
+                    <td>{studentName(inv.studentId)}</td>
+                    <td>{routeById(inv.routeId)?.code}</td>
+                    <td>{inv.termName}</td>
+                    <td>{inv.monthsCovered}</td>
+                    <td>${inv.amount.toFixed(2)}</td>
+                    <td>{inv.dueDate}</td>
+                    <td>
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        inv.status === 'Paid' ? 'bg-success/15 text-success' :
+                        inv.status === 'Cancelled' ? 'bg-muted text-muted-foreground' :
+                        'bg-warning/15 text-warning'
+                      }`}>{inv.status}</span>
+                    </td>
+                    <td>
+                      {inv.status === 'Posted' && (
+                        <button onClick={() => markInvoicePaid(inv.id)}
+                          className="px-2 py-1 text-xs rounded bg-success/15 text-success">Mark Paid</button>
+                      )}
+                    </td>
                   </tr>
                 ))}
-                {trips.length === 0 && (
-                  <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No trips logged.</td></tr>
+                {invoices.length === 0 && (
+                  <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">No invoices yet. Run a term billing above.</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
       )}
+
+
 
       {/* ACCESS / FINANCE LINK */}
       {tab === 'access' && (
@@ -519,8 +800,211 @@ export default function Transport() {
         </Modal>
       )}
 
+      {/* Schedule Modal */}
+      {showSchedForm && (
+        <Modal title="New Schedule" onClose={() => setShowSchedForm(false)}>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <Field label="Route">
+              <select className="input" value={schedForm.routeId ?? ''}
+                onChange={e => {
+                  const r = routes.find(x => x.id === e.target.value);
+                  setSchedForm({ ...schedForm, routeId: e.target.value,
+                    stopTimes: (r?.stops ?? []).map(s => ({ stop: s, time: schedForm.departTime ?? '06:30' })) });
+                }}>
+                {routes.map(r => <option key={r.id} value={r.id}>{r.code} — {r.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Direction">
+              <select className="input" value={schedForm.direction ?? 'Pickup'}
+                onChange={e => setSchedForm({ ...schedForm, direction: e.target.value as 'Pickup' | 'Dropoff' })}>
+                <option>Pickup</option><option>Dropoff</option>
+              </select>
+            </Field>
+            <Field label="Depart Time">
+              <input type="time" className="input" value={schedForm.departTime ?? '06:30'}
+                onChange={e => setSchedForm({ ...schedForm, departTime: e.target.value })} />
+            </Field>
+            <Field label="Effective From">
+              <input type="date" className="input" value={schedForm.effectiveFrom ?? ''}
+                onChange={e => setSchedForm({ ...schedForm, effectiveFrom: e.target.value })} />
+            </Field>
+            <Field label="Days" full>
+              <div className="flex flex-wrap gap-1">
+                {WEEKDAYS.map(d => {
+                  const active = (schedForm.days ?? []).includes(d);
+                  return (
+                    <button key={d} type="button"
+                      onClick={() => {
+                        const cur = schedForm.days ?? [];
+                        setSchedForm({ ...schedForm, days: active ? cur.filter(x => x !== d) : [...cur, d] as Weekday[] });
+                      }}
+                      className={`px-3 py-1 text-xs rounded ${active ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+            <Field label="Stop Times" full>
+              <div className="space-y-1">
+                {(schedForm.stopTimes ?? []).map((st, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <input className="input flex-1" value={st.stop} readOnly />
+                    <input type="time" className="input w-32" value={st.time}
+                      onChange={e => {
+                        const next = [...(schedForm.stopTimes ?? [])];
+                        next[idx] = { ...next[idx], time: e.target.value };
+                        setSchedForm({ ...schedForm, stopTimes: next });
+                      }} />
+                  </div>
+                ))}
+              </div>
+            </Field>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={() => setShowSchedForm(false)} className="px-4 py-2 rounded-lg border border-border text-sm">Cancel</button>
+            <button onClick={saveSchedule} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Save Schedule</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Trip Modal */}
+      {showTripForm && (
+        <Modal title="New Trip" onClose={() => setShowTripForm(false)}>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <Field label="From Schedule (optional)" full>
+              <select className="input" value={tripForm.scheduleId ?? ''}
+                onChange={e => {
+                  const sch = schedules.find(s => s.id === e.target.value);
+                  const r = routes.find(x => x.id === sch?.routeId);
+                  setTripForm({
+                    ...tripForm, scheduleId: e.target.value,
+                    routeId: sch?.routeId ?? tripForm.routeId,
+                    direction: sch?.direction ?? tripForm.direction,
+                    driverStaffId: r?.driverStaffId ?? tripForm.driverStaffId,
+                    attendantStaffId: r?.attendantStaffId,
+                    vehicleAssetId: r?.vehicleAssetId ?? tripForm.vehicleAssetId,
+                  });
+                }}>
+                <option value="">— ad hoc —</option>
+                {schedules.map(s => {
+                  const r = routes.find(x => x.id === s.routeId);
+                  return <option key={s.id} value={s.id}>{r?.code} · {s.direction} · {s.departTime} ({s.days.join('/')})</option>;
+                })}
+              </select>
+            </Field>
+            <Field label="Route">
+              <select className="input" value={tripForm.routeId ?? ''}
+                onChange={e => {
+                  const r = routes.find(x => x.id === e.target.value);
+                  setTripForm({ ...tripForm, routeId: e.target.value,
+                    driverStaffId: r?.driverStaffId ?? '', vehicleAssetId: r?.vehicleAssetId ?? '' });
+                }}>
+                {routes.map(r => <option key={r.id} value={r.id}>{r.code} — {r.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Direction">
+              <select className="input" value={tripForm.direction ?? 'Pickup'}
+                onChange={e => setTripForm({ ...tripForm, direction: e.target.value as 'Pickup' | 'Dropoff' })}>
+                <option>Pickup</option><option>Dropoff</option>
+              </select>
+            </Field>
+            <Field label="Date">
+              <input type="date" className="input" value={tripForm.date ?? ''}
+                onChange={e => setTripForm({ ...tripForm, date: e.target.value })} />
+            </Field>
+            <Field label="Vehicle">
+              <select className="input" value={tripForm.vehicleAssetId ?? ''}
+                onChange={e => setTripForm({ ...tripForm, vehicleAssetId: e.target.value })}>
+                {vehicles.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Driver">
+              <select className="input" value={tripForm.driverStaffId ?? ''}
+                onChange={e => setTripForm({ ...tripForm, driverStaffId: e.target.value })}>
+                {(drivers.length ? drivers : allStaff).map(s =>
+                  <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+              </select>
+            </Field>
+            <Field label="Attendant">
+              <select className="input" value={tripForm.attendantStaffId ?? ''}
+                onChange={e => setTripForm({ ...tripForm, attendantStaffId: e.target.value || undefined })}>
+                <option value="">(optional)</option>
+                {allStaff.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+              </select>
+            </Field>
+            <Field label="Odometer Start">
+              <input type="number" className="input" value={tripForm.odometerStart ?? ''}
+                onChange={e => setTripForm({ ...tripForm, odometerStart: +e.target.value })} />
+            </Field>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={() => setShowTripForm(false)} className="px-4 py-2 rounded-lg border border-border text-sm">Cancel</button>
+            <button onClick={saveTrip} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">Start Trip & Open Boarding</button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Boarding Sheet */}
+      {boardingTripId && (() => {
+        const trip = trips.find(t => t.id === boardingTripId);
+        if (!trip) return null;
+        const route = routes.find(r => r.id === trip.routeId);
+        const routeSubs = subs.filter(s => s.routeId === trip.routeId);
+        return (
+          <Modal title={`Boarding Sheet — ${route?.code} · ${trip.direction} · ${trip.date}`} onClose={() => setBoardingTripId(null)}>
+            <p className="text-xs text-muted-foreground mb-3">
+              Tap Board / Drop. Boarding is auto-denied for students whose transport fee is not current.
+              Each tap is recorded as an attendance event.
+            </p>
+            <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+              {routeSubs.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-6">No students subscribed to this route.</p>
+              )}
+              {routeSubs.map(s => {
+                const access = hasAccess(s, currentMonth());
+                const events = boardings.filter(b => b.tripId === trip.id && b.studentId === s.studentId);
+                const onBoard = events.some(b => b.action === 'Board' && b.granted);
+                const offBoard = events.some(b => b.action === 'Drop');
+                return (
+                  <div key={s.id} className="flex items-center justify-between border border-border rounded p-2 text-sm">
+                    <div>
+                      <p className="font-medium">{studentName(s.studentId)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {studentReg(s.studentId)} · {s.pickupStop} ·{' '}
+                        <span className={access ? 'text-success' : 'text-destructive'}>
+                          {access ? 'Access OK' : `Denied (paid: ${s.paidThroughMonth ?? '—'})`}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => recordBoarding(trip, s, 'Board')}
+                        className={`px-2 py-1 text-xs rounded inline-flex items-center gap-1 ${
+                          onBoard ? 'bg-success text-success-foreground' : access ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'
+                        }`}>
+                        <LogIn size={12} /> {onBoard ? 'Boarded' : 'Board'}
+                      </button>
+                      <button onClick={() => recordBoarding(trip, s, 'Drop')}
+                        className={`px-2 py-1 text-xs rounded inline-flex items-center gap-1 ${
+                          offBoard ? 'bg-info text-info-foreground' : 'bg-info/15 text-info'
+                        }`}>
+                        <LogOut size={12} /> {offBoard ? 'Dropped' : 'Drop'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end mt-3">
+              <button onClick={() => setBoardingTripId(null)} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm">Done</button>
+            </div>
+          </Modal>
+        );
+      })()}
+
       <style>{`.input{width:100%;padding:0.5rem 0.75rem;border:1px solid hsl(var(--border));border-radius:0.5rem;background:hsl(var(--background));font-size:0.875rem;}`}</style>
     </div>
+
   );
 }
 

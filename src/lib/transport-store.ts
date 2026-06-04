@@ -127,3 +127,155 @@ export function addMonths(month: string, n: number): string {
   const d = new Date(y, m - 1 + n, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+
+// ---- Scheduling --------------------------------------------------------
+export type Weekday = 'Mon' | 'Tue' | 'Wed' | 'Thu' | 'Fri' | 'Sat' | 'Sun';
+export const WEEKDAYS: Weekday[] = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+export interface StopTime {
+  stop: string;
+  time: string; // HH:MM
+}
+
+export interface TransportSchedule {
+  id: string;
+  routeId: string;
+  direction: 'Pickup' | 'Dropoff';
+  days: Weekday[];          // recurring days
+  departTime: string;       // HH:MM
+  stopTimes: StopTime[];    // per-stop ETA
+  effectiveFrom: string;
+  effectiveTo?: string;
+  active: boolean;
+}
+
+export const initialSchedules: TransportSchedule[] = [
+  {
+    id: 'SCH-001', routeId: 'RT-001', direction: 'Pickup',
+    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], departTime: '06:30',
+    stopTimes: [
+      { stop: 'Borrowdale Shops', time: '06:30' },
+      { stop: 'Greendale Mall', time: '06:45' },
+      { stop: 'Highlands Park', time: '07:00' },
+      { stop: 'School Gate', time: '07:20' },
+    ],
+    effectiveFrom: '2026-01-13', active: true,
+  },
+  {
+    id: 'SCH-002', routeId: 'RT-001', direction: 'Dropoff',
+    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], departTime: '16:00',
+    stopTimes: [
+      { stop: 'School Gate', time: '16:00' },
+      { stop: 'Highlands Park', time: '16:20' },
+      { stop: 'Greendale Mall', time: '16:35' },
+      { stop: 'Borrowdale Shops', time: '16:50' },
+    ],
+    effectiveFrom: '2026-01-13', active: true,
+  },
+  {
+    id: 'SCH-003', routeId: 'RT-002', direction: 'Pickup',
+    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], departTime: '06:40',
+    stopTimes: [
+      { stop: 'Waterfalls', time: '06:40' },
+      { stop: 'Hatfield', time: '06:55' },
+      { stop: 'Eastlea', time: '07:10' },
+      { stop: 'School Gate', time: '07:25' },
+    ],
+    effectiveFrom: '2026-01-13', active: true,
+  },
+];
+
+// ---- Boarding / Attendance --------------------------------------------
+export interface BoardingEvent {
+  id: string;
+  tripId: string;
+  studentId: string;
+  stop: string;
+  time: string;       // ISO timestamp
+  action: 'Board' | 'Drop';
+  granted: boolean;   // finance gate result
+  reason?: string;
+}
+
+export const initialBoardingEvents: BoardingEvent[] = [];
+
+// ---- Term Billing (links to Fees Structure & Billing) -----------------
+export interface TransportInvoice {
+  id: string;
+  invoiceNumber: string;
+  studentId: string;
+  subscriptionId: string;
+  routeId: string;
+  termId: string;
+  termName: string;
+  monthsCovered: number;
+  monthlyFee: number;
+  amount: number;
+  date: string;
+  dueDate: string;
+  status: 'Posted' | 'Paid' | 'Cancelled';
+  glAccountCode: string;
+  paidAt?: string;
+  postedToFeesStructure: boolean;
+}
+
+export const initialTransportInvoices: TransportInvoice[] = [];
+
+// Default revenue GL account for transport (mirrors Fees Structure & Billing)
+export const TRANSPORT_GL_CODE = '4300';
+
+export function generateTermInvoice(
+  sub: TransportSubscription,
+  route: TransportRoute,
+  term: { id: string; name: string; startDate: string; endDate: string; billingDate: string },
+  seq: number,
+): TransportInvoice {
+  const start = new Date(term.startDate);
+  const end = new Date(term.endDate);
+  const months = Math.max(
+    1,
+    (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth()) + 1,
+  );
+  const amount = months * route.monthlyFee;
+  const due = new Date(term.startDate);
+  due.setDate(due.getDate() + 14);
+  return {
+    id: `TI-${Date.now()}-${seq}`,
+    invoiceNumber: `TRX-${term.id.toUpperCase()}-${String(seq).padStart(4, '0')}`,
+    studentId: sub.studentId,
+    subscriptionId: sub.id,
+    routeId: route.id,
+    termId: term.id,
+    termName: term.name,
+    monthsCovered: months,
+    monthlyFee: route.monthlyFee,
+    amount,
+    date: term.billingDate,
+    dueDate: due.toISOString().slice(0, 10),
+    status: 'Posted',
+    glAccountCode: TRANSPORT_GL_CODE,
+    postedToFeesStructure: true,
+  };
+}
+
+// Advance paidThroughMonth by invoice.monthsCovered when paid.
+export function applyInvoicePayment(
+  sub: TransportSubscription,
+  invoice: TransportInvoice,
+): TransportSubscription {
+  const base = sub.paidThroughMonth && sub.paidThroughMonth >= currentMonth()
+    ? sub.paidThroughMonth
+    : addMonths(currentMonth(), -1);
+  const newThrough = addMonths(base, invoice.monthsCovered);
+  return {
+    ...sub,
+    lastPaidMonth: currentMonth(),
+    paidThroughMonth: newThrough,
+    status: 'Paid',
+  };
+}
+
+export function dayKey(dateISO: string): Weekday {
+  const d = new Date(dateISO);
+  return WEEKDAYS[(d.getDay() + 6) % 7];
+}
