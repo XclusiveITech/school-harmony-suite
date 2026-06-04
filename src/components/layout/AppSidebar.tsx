@@ -131,9 +131,12 @@ export const navItems: NavItem[] = [
       { label: 'Dashboard', path: '/transport#dashboard' },
       { label: 'Routes & Vehicles', path: '/transport#routes' },
       { label: 'Student Subscriptions', path: '/transport#subscriptions' },
-      { label: 'Trips Log', path: '/transport#trips' },
+      { label: 'Schedule & Timetable', path: '/transport#schedule' },
+      { label: 'Trips & Boarding', path: '/transport#trips' },
+      { label: 'Term Billing', path: '/transport#billing' },
       { label: 'Access Control (Finance)', path: '/transport#access' },
       { label: 'Printable Report', path: '/transport#report' },
+
     ]
   },
   {
