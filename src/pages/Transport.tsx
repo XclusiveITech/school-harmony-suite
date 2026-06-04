@@ -45,6 +45,9 @@ export default function Transport() {
   const [routes, setRoutes] = useState<TransportRoute[]>(initialRoutes);
   const [subs, setSubs] = useState<TransportSubscription[]>(initialSubscriptions);
   const [trips, setTrips] = useState<TransportTrip[]>(initialTrips);
+  const [schedules, setSchedules] = useState<TransportSchedule[]>(initialSchedules);
+  const [boardings, setBoardings] = useState<BoardingEvent[]>(initialBoardingEvents);
+  const [invoices, setInvoices] = useState<TransportInvoice[]>(initialTransportInvoices);
 
   const vehicles = useMemo(() => assets.filter(a => a.category === 'Vehicles'), []);
   const drivers = useMemo(
@@ -52,6 +55,18 @@ export default function Transport() {
     [],
   );
   const allStaff = staff;
+
+  // Forms
+  const [showRouteForm, setShowRouteForm] = useState(false);
+  const [editingRoute, setEditingRoute] = useState<string | null>(null);
+  const [routeForm, setRouteForm] = useState<Partial<TransportRoute> & { stopsText?: string }>({});
+
+  const [showSchedForm, setShowSchedForm] = useState(false);
+  const [schedForm, setSchedForm] = useState<Partial<TransportSchedule>>({});
+  const [boardingTripId, setBoardingTripId] = useState<string | null>(null);
+  const [showTripForm, setShowTripForm] = useState(false);
+  const [tripForm, setTripForm] = useState<Partial<TransportTrip> & { scheduleId?: string }>({});
+
 
   // Forms
   const [showRouteForm, setShowRouteForm] = useState(false);
