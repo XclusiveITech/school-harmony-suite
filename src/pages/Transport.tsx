@@ -77,9 +77,6 @@ export default function Transport() {
     () => staff.filter(s => /driver|transport/i.test(s.role) || /transport/i.test(s.department)),
     [],
   );
-    () => staff.filter(s => /driver|transport/i.test(s.role) || /transport/i.test(s.department)),
-    [],
-  );
   const allStaff = staff;
 
   // Forms
