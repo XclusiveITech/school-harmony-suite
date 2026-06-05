@@ -52,9 +52,31 @@ export default function Transport() {
   const [schedules, setSchedules] = useState<TransportSchedule[]>(initialSchedules);
   const [boardings, setBoardings] = useState<BoardingEvent[]>(initialBoardingEvents);
   const [invoices, setInvoices] = useState<TransportInvoice[]>(initialTransportInvoices);
+  const [audit, setAudit] = useState<TransportAuditEntry[]>(initialAuditTrail);
+  const { user } = useAuth();
+  const actorName = user?.name ?? 'System';
+
+  // ----- Audit Logger -----
+  const logAudit = (entry: Omit<TransportAuditEntry, 'id' | 'timestamp' | 'actor'> & { actor?: string }) => {
+    setAudit(prev => [...prev, {
+      id: `AU-${Date.now()}-${prev.length + 1}`,
+      timestamp: new Date().toISOString(),
+      actor: entry.actor ?? actorName,
+      ...entry,
+    }]);
+  };
+
+  // ----- Attendance Report filters -----
+  const [filtRoute, setFiltRoute] = useState<string>('All');
+  const [filtTerm, setFiltTerm] = useState<string>('All');
+  const [filtFrom, setFiltFrom] = useState<string>('');
+  const [filtTo, setFiltTo] = useState<string>('');
 
   const vehicles = useMemo(() => assets.filter(a => a.category === 'Vehicles'), []);
   const drivers = useMemo(
+    () => staff.filter(s => /driver|transport/i.test(s.role) || /transport/i.test(s.department)),
+    [],
+  );
     () => staff.filter(s => /driver|transport/i.test(s.role) || /transport/i.test(s.department)),
     [],
   );
