@@ -221,6 +221,27 @@ export interface TransportInvoice {
 
 export const initialTransportInvoices: TransportInvoice[] = [];
 
+// ---- Audit Trail -------------------------------------------------------
+export type AuditAction =
+  | 'Boarding' | 'Dropoff' | 'Edit' | 'FinanceUnlock'
+  | 'InvoicePosted' | 'InvoicePaid' | 'Suspend' | 'Activate'
+  | 'SubscribeStudent' | 'RouteChange';
+
+export interface TransportAuditEntry {
+  id: string;
+  timestamp: string;
+  actor: string;            // who (user/system)
+  source: 'System' | 'User' | 'Finance';
+  action: AuditAction;
+  entity: 'Boarding' | 'Subscription' | 'Invoice' | 'Route' | 'Schedule';
+  entityId: string;
+  tripId?: string;
+  studentId?: string;
+  details: string;
+}
+
+export const initialAuditTrail: TransportAuditEntry[] = [];
+
 // Default revenue GL account for transport (mirrors Fees Structure & Billing)
 export const TRANSPORT_GL_CODE = '4300';
 
