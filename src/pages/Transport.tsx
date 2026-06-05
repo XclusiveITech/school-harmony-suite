@@ -464,11 +464,19 @@ export default function Transport() {
       {/* SCHEDULE & TIMETABLE */}
       {tab === 'schedule' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center print:hidden">
             <p className="text-sm text-muted-foreground">Recurring timetables per route with per-stop ETAs.</p>
-            <button onClick={() => openNewSchedule()} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
-              <Plus size={16} /> New Schedule
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => window.print()} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium">
+                <Printer size={16} /> Print Timetable
+              </button>
+              <button onClick={() => openNewSchedule()} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
+                <Plus size={16} /> New Schedule
+              </button>
+            </div>
+          </div>
+          <div className="hidden print:block">
+            <ReportHeader reportTitle="Transport Schedule & Timetable" subtitle={`As at ${new Date().toLocaleDateString()}`} />
           </div>
           {routes.map(r => {
             const rs = schedules.filter(s => s.routeId === r.id);
