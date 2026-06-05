@@ -5,15 +5,17 @@ import { students, staff, assets } from '@/lib/dummy-data';
 import ReportHeader from '@/components/ReportHeader';
 import {
   initialRoutes, initialSubscriptions, initialTrips,
-  initialSchedules, initialBoardingEvents, initialTransportInvoices,
+  initialSchedules, initialBoardingEvents, initialTransportInvoices, initialAuditTrail,
   type TransportRoute, type TransportSubscription, type TransportTrip,
   type TransportSchedule, type BoardingEvent, type TransportInvoice, type Weekday,
+  type TransportAuditEntry, type AuditAction,
   WEEKDAYS, currentMonth, deriveStatus, monthsOwed, addMonths, hasAccess,
   generateTermInvoice, applyInvoicePayment, dayKey, TRANSPORT_GL_CODE,
 } from '@/lib/transport-store';
 import { academicTerms } from '@/lib/fees-structure-store';
+import { useAuth } from '@/contexts/AuthContext';
 
-type Tab = 'dashboard' | 'routes' | 'subscriptions' | 'schedule' | 'trips' | 'billing' | 'access' | 'report';
+type Tab = 'dashboard' | 'routes' | 'subscriptions' | 'schedule' | 'trips' | 'attendance' | 'billing' | 'access' | 'audit' | 'report';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -21,8 +23,10 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'subscriptions', label: 'Subscriptions' },
   { id: 'schedule', label: 'Schedule & Timetable' },
   { id: 'trips', label: 'Trips & Boarding' },
+  { id: 'attendance', label: 'Attendance Report' },
   { id: 'billing', label: 'Term Billing' },
   { id: 'access', label: 'Access Control' },
+  { id: 'audit', label: 'Audit Trail' },
   { id: 'report', label: 'Printable Report' },
 ];
 
