@@ -601,6 +601,176 @@ export default function Transport() {
         </div>
       )}
 
+      {/* ATTENDANCE REPORT (printable, filterable) */}
+      {tab === 'attendance' && (() => {
+        const term = academicTerms.find(t => t.id === filtTerm);
+        const tFrom = filtFrom || (term?.startDate ?? '');
+        const tTo = filtTo || (term?.endDate ?? '');
+        const filteredTrips = trips.filter(t => {
+          if (filtRoute !== 'All' && t.routeId !== filtRoute) return false;
+          if (tFrom && t.date < tFrom) return false;
+          if (tTo && t.date > tTo) return false;
+          return true;
+        });
+        const totalBoarded = filteredTrips.reduce((sum, t) =>
+          sum + boardings.filter(b => b.tripId === t.id && b.action === 'Board' && b.granted).length, 0);
+        const totalDropped = filteredTrips.reduce((sum, t) =>
+          sum + boardings.filter(b => b.tripId === t.id && b.action === 'Drop').length, 0);
+        const totalDenied = filteredTrips.reduce((sum, t) =>
+          sum + boardings.filter(b => b.tripId === t.id && !b.granted).length, 0);
+        return (
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-3 items-end print:hidden">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Route</label>
+                <select value={filtRoute} onChange={e => setFiltRoute(e.target.value)} className="input">
+                  <option value="All">All Routes</option>
+                  {routes.map(r => <option key={r.id} value={r.id}>{r.code} — {r.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Term</label>
+                <select value={filtTerm} onChange={e => setFiltTerm(e.target.value)} className="input">
+                  <option value="All">All Terms</option>
+                  {academicTerms.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Date From</label>
+                <input type="date" value={filtFrom} onChange={e => setFiltFrom(e.target.value)} className="input" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Date To</label>
+                <input type="date" value={filtTo} onChange={e => setFiltTo(e.target.value)} className="input" />
+              </div>
+              <button onClick={() => { setFiltRoute('All'); setFiltTerm('All'); setFiltFrom(''); setFiltTo(''); }}
+                className="px-3 py-2 rounded-lg border border-border text-sm">Reset</button>
+              <button onClick={() => window.print()} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium">
+                <Printer size={16} /> Print Report
+              </button>
+            </div>
+
+            <div className="bg-card border border-border rounded-lg p-6 print:border-0">
+              <ReportHeader
+                reportTitle="Boarding & Drop-off Attendance Report"
+                subtitle={`${filtRoute === 'All' ? 'All Routes' : routeById(filtRoute)?.name} · ${term ? term.name : 'All Terms'} · ${tFrom || 'any'} → ${tTo || 'any'}`} />
+              <div className="grid grid-cols-4 gap-2 text-center mb-4 text-xs">
+                <div className="border border-border rounded p-2"><p className="text-muted-foreground">Trips</p><p className="font-bold text-lg">{filteredTrips.length}</p></div>
+                <div className="border border-border rounded p-2"><p className="text-muted-foreground">Boarded</p><p className="font-bold text-lg text-success">{totalBoarded}</p></div>
+                <div className="border border-border rounded p-2"><p className="text-muted-foreground">Dropped</p><p className="font-bold text-lg text-info">{totalDropped}</p></div>
+                <div className="border border-border rounded p-2"><p className="text-muted-foreground">Denied</p><p className="font-bold text-lg text-destructive">{totalDenied}</p></div>
+              </div>
+
+              {filteredTrips.length === 0 && (
+                <p className="text-sm text-center text-muted-foreground py-6">No trips match the selected filters.</p>
+              )}
+
+              {filteredTrips.map(t => {
+                const route = routeById(t.routeId);
+                const routeSubs = subs.filter(s => s.routeId === t.routeId);
+                const evs = boardings.filter(b => b.tripId === t.id);
+                return (
+                  <div key={t.id} className="mb-6 break-inside-avoid">
+                    <div className="border-b border-border pb-1 mb-2">
+                      <p className="font-semibold text-sm">
+                        {t.date} · {route?.code} — {route?.name} · {t.direction}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Vehicle: {vehicleName(t.vehicleAssetId)} · Driver: {staffName(t.driverStaffId)} · Attendant: {staffName(t.attendantStaffId)}
+                      </p>
+                    </div>
+                    <table className="w-full text-xs border border-border">
+                      <thead className="bg-muted/50 text-left">
+                        <tr>
+                          <th className="p-2">Reg #</th><th>Student</th><th>Stop</th>
+                          <th>Board Time</th><th>Drop Time</th><th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {routeSubs.map(s => {
+                          const be = evs.find(e => e.studentId === s.studentId && e.action === 'Board');
+                          const de = evs.find(e => e.studentId === s.studentId && e.action === 'Drop');
+                          const status = be?.granted ? 'Boarded' : be && !be.granted ? 'Denied' : 'Absent';
+                          return (
+                            <tr key={s.id} className="border-t border-border">
+                              <td className="p-2">{studentReg(s.studentId)}</td>
+                              <td>{studentName(s.studentId)}</td>
+                              <td>{s.pickupStop}</td>
+                              <td className="font-mono">{be ? new Date(be.time).toLocaleTimeString() : '—'}</td>
+                              <td className="font-mono">{de ? new Date(de.time).toLocaleTimeString() : '—'}</td>
+                              <td className={
+                                status === 'Boarded' ? 'text-success' :
+                                status === 'Denied' ? 'text-destructive' : 'text-muted-foreground'
+                              }>{status}</td>
+                            </tr>
+                          );
+                        })}
+                        {routeSubs.length === 0 && (
+                          <tr><td colSpan={6} className="p-3 text-center text-muted-foreground">No subscribers on this route.</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* AUDIT TRAIL */}
+      {tab === 'audit' && (
+        <div className="space-y-4">
+          <div className="flex justify-between items-center print:hidden">
+            <p className="text-sm text-muted-foreground">
+              Records every attendance creation, finance unlock, edit and invoice action with timestamp and actor.
+            </p>
+            <button onClick={() => window.print()} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium">
+              <Printer size={16} /> Print
+            </button>
+          </div>
+          <div className="bg-card border border-border rounded-lg p-4 print:border-0">
+            <div className="hidden print:block">
+              <ReportHeader reportTitle="Transport Audit Trail" subtitle={`As at ${new Date().toLocaleString()}`} />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="text-left text-muted-foreground bg-muted/50">
+                  <tr>
+                    <th className="p-2">Timestamp</th><th>Actor</th><th>Source</th>
+                    <th>Action</th><th>Entity</th><th>Student</th><th>Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...audit].reverse().map(a => (
+                    <tr key={a.id} className="border-t border-border/50">
+                      <td className="p-2 font-mono whitespace-nowrap">{new Date(a.timestamp).toLocaleString()}</td>
+                      <td>{a.actor}</td>
+                      <td>
+                        <span className={`px-2 py-0.5 rounded text-[10px] ${
+                          a.source === 'Finance' ? 'bg-info/15 text-info' :
+                          a.source === 'System' ? 'bg-muted text-muted-foreground' :
+                          'bg-primary/15 text-primary'
+                        }`}>{a.source}</span>
+                      </td>
+                      <td className="font-medium">{a.action}</td>
+                      <td>{a.entity} <span className="text-muted-foreground">({a.entityId.slice(0, 12)})</span></td>
+                      <td>{a.studentId ? studentName(a.studentId) : '—'}</td>
+                      <td className="text-muted-foreground">{a.details}</td>
+                    </tr>
+                  ))}
+                  {audit.length === 0 && (
+                    <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No audit entries yet. Record boarding/drop-off or finance actions to populate this trail.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+
       {/* TERM BILLING (links Fees Structure & Billing) */}
       {tab === 'billing' && (
         <div className="space-y-4">
