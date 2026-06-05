@@ -173,20 +173,33 @@ export default function Transport() {
     setSubs(prev => [...prev, {
       id, ...subForm, monthlyFee: r?.monthlyFee ?? subForm.monthlyFee ?? 0,
     } as TransportSubscription]);
+    logAudit({ source: 'User', action: 'SubscribeStudent', entity: 'Subscription', entityId: id,
+      studentId: subForm.studentId, details: `Subscribed to route ${r?.code} at ${subForm.pickupStop}` });
     setShowSubForm(false);
   };
-  const removeSub = (id: string) => setSubs(prev => prev.filter(s => s.id !== id));
+  const removeSub = (id: string) => {
+    setSubs(prev => prev.filter(s => s.id !== id));
+    logAudit({ source: 'User', action: 'Edit', entity: 'Subscription', entityId: id, details: 'Subscription removed' });
+  };
 
   const recordPayment = (id: string) => {
     setSubs(prev => prev.map(s => {
       if (s.id !== id) return s;
       const next = s.paidThroughMonth ? addMonths(s.paidThroughMonth, 1) : currentMonth();
+      logAudit({ source: 'Finance', action: 'FinanceUnlock', entity: 'Subscription', entityId: id,
+        studentId: s.studentId, details: `Manual +1 month payment. Access extended to ${next}.` });
       return { ...s, lastPaidMonth: currentMonth(), paidThroughMonth: next, status: 'Paid' };
     }));
   };
   const toggleSuspend = (id: string) => {
-    setSubs(prev => prev.map(s => s.id !== id ? s
-      : { ...s, status: s.status === 'Suspended' ? 'Pending' : 'Suspended' }));
+    setSubs(prev => prev.map(s => {
+      if (s.id !== id) return s;
+      const next: TransportSubscription = { ...s, status: s.status === 'Suspended' ? 'Pending' : 'Suspended' };
+      logAudit({ source: 'User', action: next.status === 'Suspended' ? 'Suspend' : 'Activate',
+        entity: 'Subscription', entityId: id, studentId: s.studentId,
+        details: `Subscription ${next.status === 'Suspended' ? 'suspended' : 'reactivated'}` });
+      return next;
+    }));
   };
 
   // ---------- Schedule CRUD ----------
