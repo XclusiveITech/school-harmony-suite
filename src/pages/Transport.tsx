@@ -256,6 +256,11 @@ export default function Transport() {
       time: new Date().toISOString(), action, granted, reason,
     };
     setBoardings(prev => [...prev.filter(b => !(b.tripId === trip.id && b.studentId === sub.studentId && b.action === action)), ev]);
+    logAudit({
+      source: 'System', action: action === 'Board' ? 'Boarding' : 'Dropoff',
+      entity: 'Boarding', entityId: ev.id, tripId: trip.id, studentId: sub.studentId,
+      details: `${action} @ ${sub.pickupStop} — ${granted ? 'Granted' : 'Denied'}${reason ? ` (${reason})` : ''}`,
+    });
   };
 
   // ---------- Term Billing ----------
@@ -275,6 +280,10 @@ export default function Transport() {
       return;
     }
     setInvoices(prev => [...prev, ...newInvoices]);
+    newInvoices.forEach(inv => logAudit({
+      source: 'Finance', action: 'InvoicePosted', entity: 'Invoice', entityId: inv.id,
+      studentId: inv.studentId, details: `Posted ${inv.invoiceNumber} ($${inv.amount.toFixed(2)}) for ${inv.termName} → GL ${inv.glAccountCode}`,
+    }));
     alert(`${newInvoices.length} invoice(s) posted to Fees Structure & Billing (GL ${TRANSPORT_GL_CODE}).`);
   };
   const markInvoicePaid = (invoiceId: string) => {
@@ -282,6 +291,10 @@ export default function Transport() {
     if (!inv || inv.status === 'Paid') return;
     setInvoices(prev => prev.map(i => i.id === invoiceId ? { ...i, status: 'Paid', paidAt: new Date().toISOString() } : i));
     setSubs(prev => prev.map(s => s.id === inv.subscriptionId ? applyInvoicePayment(s, inv) : s));
+    logAudit({ source: 'Finance', action: 'InvoicePaid', entity: 'Invoice', entityId: inv.id,
+      studentId: inv.studentId, details: `${inv.invoiceNumber} marked paid; access extended ${inv.monthsCovered} month(s).` });
+    logAudit({ source: 'Finance', action: 'FinanceUnlock', entity: 'Subscription', entityId: inv.subscriptionId,
+      studentId: inv.studentId, details: `Auto-unlocked transport access via invoice ${inv.invoiceNumber}.` });
   };
 
 
