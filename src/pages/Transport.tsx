@@ -1222,7 +1222,11 @@ export default function Transport() {
                 );
               })}
             </div>
-            <div className="flex justify-end mt-3">
+            <div className="flex justify-end gap-2 mt-3">
+              <button onClick={() => { setBoardingTripId(null); setTab('attendance'); }}
+                className="inline-flex items-center gap-1 px-3 py-2 rounded-lg border border-border text-sm">
+                <Printer size={14} /> Open Printable Report
+              </button>
               <button onClick={() => setBoardingTripId(null)} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm">Done</button>
             </div>
           </Modal>
