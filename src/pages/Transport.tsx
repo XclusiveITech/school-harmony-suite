@@ -8,7 +8,7 @@ import {
   initialSchedules, initialBoardingEvents, initialTransportInvoices, initialAuditTrail,
   type TransportRoute, type TransportSubscription, type TransportTrip,
   type TransportSchedule, type BoardingEvent, type TransportInvoice, type Weekday,
-  type TransportAuditEntry, type AuditAction,
+  type TransportAuditEntry,
   WEEKDAYS, currentMonth, deriveStatus, monthsOwed, addMonths, hasAccess,
   generateTermInvoice, applyInvoicePayment, dayKey, TRANSPORT_GL_CODE,
 } from '@/lib/transport-store';
