@@ -369,7 +369,7 @@ function ReportTab({ hostels }: { hostels: Hostel[] }) {
         <button onClick={() => window.print()} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-input text-sm"><Printer size={16} /> Print</button>
       </div>
       <div className="bg-card border border-border rounded-xl p-6 shadow-card print:shadow-none print:border-0">
-        <ReportHeader title="Boarding Facility Occupancy Report" subtitle={new Date().toLocaleDateString()} />
+        <ReportHeader reportTitle="Boarding Facility Occupancy Report" subtitle={new Date().toLocaleDateString()} />
         <table className="w-full text-sm mt-4">
           <thead className="bg-muted/50">
             <tr className="text-left">
