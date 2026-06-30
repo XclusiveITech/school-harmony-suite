@@ -133,6 +133,51 @@ export default function EnrollStudent() {
           </div>
         </div>
 
+        {isBoarding && (
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Bed size={18} className="text-primary" />
+              <h4 className="font-display font-semibold text-foreground">Boarding Allocation</h4>
+              <span className="text-xs text-muted-foreground">Auto-allocated based on gender ({genderCat}) and level ({form.level})</span>
+            </div>
+            {vacancies.length === 0 ? (
+              <p className="text-sm text-destructive">No vacant beds available in {genderCat} hostels for {form.level}. Please create a hostel or free a bed before enrolling as Boarding.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Hostel</label>
+                  <div className="px-3 py-2 rounded-lg border border-input bg-background text-sm">{pickedHostel?.name || '—'}</div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Room Number</label>
+                  <div className="px-3 py-2 rounded-lg border border-input bg-background text-sm">{pickedRoom?.number || '—'}</div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Bed Number</label>
+                  <div className="px-3 py-2 rounded-lg border border-input bg-background text-sm">#{pick?.bedNumber ?? '—'}</div>
+                </div>
+                <div className="md:col-span-3">
+                  <label className="block text-sm font-medium text-foreground mb-1">Change to another vacant bed (optional)</label>
+                  <select
+                    value={pick ? `${pick.roomId}|${pick.bedNumber}` : ''}
+                    onChange={e => {
+                      const [roomId, bed] = e.target.value.split('|');
+                      const v = vacancies.find(v => v.room.id === roomId && v.bedNumber === +bed);
+                      if (v) setPick({ hostelId: v.hostel.id, roomId: v.room.id, bedNumber: v.bedNumber });
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm">
+                    {vacancies.map(v => (
+                      <option key={`${v.room.id}-${v.bedNumber}`} value={`${v.room.id}|${v.bedNumber}`}>
+                        {v.hostel.name} · Room {v.room.number} · Bed #{v.bedNumber}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <h3 className="font-display font-semibold text-card-foreground border-b border-border pb-3 pt-2">Parent/Guardian Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
