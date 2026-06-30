@@ -140,6 +140,16 @@ export const navItems: NavItem[] = [
     ]
   },
   {
+    label: 'Boarding Facility', icon: <Building2 size={20} />,
+    children: [
+      { label: 'Dashboard', path: '/boarding#dashboard' },
+      { label: 'Hostels', path: '/boarding#hostels' },
+      { label: 'Rooms & Beds', path: '/boarding#rooms' },
+      { label: 'Allocations', path: '/boarding#allocations' },
+      { label: 'Printable Report', path: '/boarding#report' },
+    ]
+  },
+  {
     label: 'Tuckshop', icon: <ShoppingCart size={20} />,
     children: [
       { label: 'POS', path: '/tuckshop#pos' },

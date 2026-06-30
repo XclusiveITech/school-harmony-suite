@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateRegNumber } from '@/lib/dummy-data';
-import { Save, ArrowLeft } from 'lucide-react';
+import { Save, ArrowLeft, Bed } from 'lucide-react';
+import {
+  useHostels, useAllocations, findFreeBed, listVacantBeds, allocateBed,
+  type HostelCategory,
+} from '@/lib/boarding-store';
 
 export default function EnrollStudent() {
   const navigate = useNavigate();
@@ -15,9 +19,39 @@ export default function EnrollStudent() {
 
   const update = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
 
+  // ----- Boarding auto-allocation -----
+  const hostels = useHostels();
+  const allocations = useAllocations(); // re-render when allocations change
+  const isBoarding = form.boardingStatus === 'Boarding';
+  const genderCat: HostelCategory = form.gender === 'Female' ? 'Girls' : 'Boys';
+
+  const vacancies = useMemo(
+    () => isBoarding ? listVacantBeds(genderCat, form.level) : [],
+    [isBoarding, genderCat, form.level, hostels, allocations],
+  );
+  const [pick, setPick] = useState<{ hostelId: string; roomId: string; bedNumber: number } | null>(null);
+
+  // auto-pick first free bed whenever conditions change
+  useEffect(() => {
+    if (!isBoarding) { setPick(null); return; }
+    const free = findFreeBed(genderCat, form.level);
+    setPick(free ? { hostelId: free.hostel.id, roomId: free.room.id, bedNumber: free.bedNumber } : null);
+  }, [isBoarding, genderCat, form.level, hostels.length]);
+
+  const pickedHostel = pick && hostels.find(h => h.id === pick.hostelId);
+  const pickedRoom = pickedHostel?.rooms.find(r => r.id === pick!.roomId);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const regNumber = generateRegNumber(form.firstName, form.lastName);
+    if (isBoarding && pick) {
+      allocateBed({
+        studentId: regNumber,
+        studentName: `${form.firstName} ${form.lastName}`,
+        gender: genderCat, level: form.level,
+        hostelId: pick.hostelId, roomId: pick.roomId, bedNumber: pick.bedNumber,
+      });
+    }
     setSaved({ regNumber, username: regNumber });
   };
 
@@ -98,6 +132,51 @@ export default function EnrollStudent() {
             </select>
           </div>
         </div>
+
+        {isBoarding && (
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Bed size={18} className="text-primary" />
+              <h4 className="font-display font-semibold text-foreground">Boarding Allocation</h4>
+              <span className="text-xs text-muted-foreground">Auto-allocated based on gender ({genderCat}) and level ({form.level})</span>
+            </div>
+            {vacancies.length === 0 ? (
+              <p className="text-sm text-destructive">No vacant beds available in {genderCat} hostels for {form.level}. Please create a hostel or free a bed before enrolling as Boarding.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Hostel</label>
+                  <div className="px-3 py-2 rounded-lg border border-input bg-background text-sm">{pickedHostel?.name || '—'}</div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Room Number</label>
+                  <div className="px-3 py-2 rounded-lg border border-input bg-background text-sm">{pickedRoom?.number || '—'}</div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Bed Number</label>
+                  <div className="px-3 py-2 rounded-lg border border-input bg-background text-sm">#{pick?.bedNumber ?? '—'}</div>
+                </div>
+                <div className="md:col-span-3">
+                  <label className="block text-sm font-medium text-foreground mb-1">Change to another vacant bed (optional)</label>
+                  <select
+                    value={pick ? `${pick.roomId}|${pick.bedNumber}` : ''}
+                    onChange={e => {
+                      const [roomId, bed] = e.target.value.split('|');
+                      const v = vacancies.find(v => v.room.id === roomId && v.bedNumber === +bed);
+                      if (v) setPick({ hostelId: v.hostel.id, roomId: v.room.id, bedNumber: v.bedNumber });
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm">
+                    {vacancies.map(v => (
+                      <option key={`${v.room.id}-${v.bedNumber}`} value={`${v.room.id}|${v.bedNumber}`}>
+                        {v.hostel.name} · Room {v.room.number} · Bed #{v.bedNumber}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <h3 className="font-display font-semibold text-card-foreground border-b border-border pb-3 pt-2">Parent/Guardian Information</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
