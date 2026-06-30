@@ -148,6 +148,7 @@ export const navItems: NavItem[] = [
       { label: 'Allocations', path: '/boarding#allocations' },
       { label: 'Printable Report', path: '/boarding#report' },
     ]
+  },
   {
     label: 'Tuckshop', icon: <ShoppingCart size={20} />,
     children: [
