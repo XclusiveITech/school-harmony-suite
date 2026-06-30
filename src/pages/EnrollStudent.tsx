@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateRegNumber } from '@/lib/dummy-data';
-import { Save, ArrowLeft } from 'lucide-react';
+import { Save, ArrowLeft, Bed } from 'lucide-react';
+import {
+  useHostels, useAllocations, findFreeBed, listVacantBeds, allocateBed,
+  type HostelCategory,
+} from '@/lib/boarding-store';
 
 export default function EnrollStudent() {
   const navigate = useNavigate();
@@ -15,9 +19,39 @@ export default function EnrollStudent() {
 
   const update = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
 
+  // ----- Boarding auto-allocation -----
+  const hostels = useHostels();
+  const allocations = useAllocations(); // re-render when allocations change
+  const isBoarding = form.boardingStatus === 'Boarding';
+  const genderCat: HostelCategory = form.gender === 'Female' ? 'Girls' : 'Boys';
+
+  const vacancies = useMemo(
+    () => isBoarding ? listVacantBeds(genderCat, form.level) : [],
+    [isBoarding, genderCat, form.level, hostels, allocations],
+  );
+  const [pick, setPick] = useState<{ hostelId: string; roomId: string; bedNumber: number } | null>(null);
+
+  // auto-pick first free bed whenever conditions change
+  useEffect(() => {
+    if (!isBoarding) { setPick(null); return; }
+    const free = findFreeBed(genderCat, form.level);
+    setPick(free ? { hostelId: free.hostel.id, roomId: free.room.id, bedNumber: free.bedNumber } : null);
+  }, [isBoarding, genderCat, form.level, hostels.length]);
+
+  const pickedHostel = pick && hostels.find(h => h.id === pick.hostelId);
+  const pickedRoom = pickedHostel?.rooms.find(r => r.id === pick!.roomId);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const regNumber = generateRegNumber(form.firstName, form.lastName);
+    if (isBoarding && pick) {
+      allocateBed({
+        studentId: regNumber,
+        studentName: `${form.firstName} ${form.lastName}`,
+        gender: genderCat, level: form.level,
+        hostelId: pick.hostelId, roomId: pick.roomId, bedNumber: pick.bedNumber,
+      });
+    }
     setSaved({ regNumber, username: regNumber });
   };
 
