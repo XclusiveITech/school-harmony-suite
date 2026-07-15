@@ -381,8 +381,31 @@ function AllocationsTab() {
                 <td className="px-4 py-2">{lk?.room.number}</td>
                 <td className="px-4 py-2">#{a.bedNumber}</td>
                 <td className="px-4 py-2 text-muted-foreground">{new Date(a.allocatedAt).toLocaleDateString()}</td>
-                <td className="px-4 py-2 text-right">
-                  <button onClick={() => { if (confirm('Release this allocation?')) releaseAllocation(a.id); }} className="text-xs text-destructive hover:underline">Release</button>
+                <td className="px-4 py-2 text-right space-x-2">
+                  <button
+                    onClick={() => {
+                      const vac = listVacantBeds(a.gender, a.level);
+                      if (vac.length === 0) { alert('No vacant beds for this gender/level.'); return; }
+                      const opts = vac.map((v, i) => `${i + 1}. ${v.hostel.name} · Room ${v.room.number} · Bed #${v.bedNumber}`).join('\n');
+                      const pick = prompt(`Move to bed — enter number:\n${opts}`);
+                      const idx = pick ? parseInt(pick, 10) - 1 : -1;
+                      if (idx < 0 || idx >= vac.length) return;
+                      const reason = prompt('Reason for bed change?') || '';
+                      const v = vac[idx];
+                      allocateBed({
+                        studentId: a.studentId, studentName: a.studentName,
+                        gender: a.gender, level: a.level,
+                        hostelId: v.hostel.id, roomId: v.room.id, bedNumber: v.bedNumber,
+                        source: 'manual', reason,
+                      });
+                    }}
+                    className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                  ><ArrowRightLeft size={12} /> Move</button>
+                  <button onClick={() => {
+                    if (!confirm('Release this allocation?')) return;
+                    const reason = prompt('Reason for release?') || '';
+                    releaseAllocation(a.id, reason);
+                  }} className="text-xs text-destructive hover:underline">Release</button>
                 </td>
               </tr>
             );
