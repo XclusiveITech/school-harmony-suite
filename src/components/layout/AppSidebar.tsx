@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, FileText, DollarSign,
   ClipboardList, Settings, LogOut, ChevronDown, ChevronRight, Building2,
   Package, Landmark, UserCog, Calendar, BarChart3, Receipt, CreditCard,
-  Warehouse, TrendingUp, Bell, Menu, X, ShoppingCart, ClipboardCheck, Video, Bus
+  Warehouse, TrendingUp, Bell, Menu, X, ShoppingCart, ClipboardCheck, Video, Bus, UtensilsCrossed
 } from 'lucide-react';
 
 interface NavItem {
@@ -146,7 +146,21 @@ export const navItems: NavItem[] = [
       { label: 'Hostels', path: '/boarding#hostels' },
       { label: 'Rooms & Beds', path: '/boarding#rooms' },
       { label: 'Allocations', path: '/boarding#allocations' },
+      { label: 'Audit Trail', path: '/boarding#audit' },
       { label: 'Printable Report', path: '/boarding#report' },
+    ]
+  },
+  {
+    label: 'Canteen', icon: <UtensilsCrossed size={20} />,
+    children: [
+      { label: 'Dashboard', path: '/canteen#dashboard' },
+      { label: 'Dining Halls', path: '/canteen#halls' },
+      { label: 'Meals Chart', path: '/canteen#meals' },
+      { label: 'Staff', path: '/canteen#staff' },
+      { label: 'Stock Transfers', path: '/canteen#transfers' },
+      { label: 'Requisitions', path: '/canteen#requisitions' },
+      { label: 'Reviews', path: '/canteen#reviews' },
+      { label: 'Audit Trail', path: '/canteen#audit' },
     ]
   },
   {

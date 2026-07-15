@@ -36,6 +36,8 @@ import Requisitions from "@/pages/Requisitions";
 import OnlineClasses from "@/pages/OnlineClasses";
 import Transport from "@/pages/Transport";
 import Boarding from "@/pages/Boarding";
+import Canteen from "@/pages/Canteen";
+import PortalCanteen from "@/pages/portal/PortalCanteen";
 import PortalOnlineClasses from "@/pages/portal/PortalOnlineClasses";
 import Subjects from "@/pages/academics/Subjects";
 import Classes from "@/pages/academics/Classes";
@@ -124,6 +126,7 @@ const App = () => (
                 <Route path="/transport" element={<Transport />} />
                 <Route path="/transport/:tab" element={<Transport />} />
                 <Route path="/boarding" element={<Boarding />} />
+                <Route path="/canteen" element={<Canteen />} />
                 <Route path="/admin/settings" element={<SchoolSettings />} />
                 <Route path="/admin/branches" element={<BranchManagement />} />
                 <Route path="/admin/roles" element={<PlaceholderPage />} />
@@ -142,6 +145,7 @@ const App = () => (
                 <Route path="/portal/notices" element={<PortalNotices />} />
                 <Route path="/portal/profile" element={<PortalProfile />} />
                 <Route path="/portal/online-classes" element={<PortalOnlineClasses />} />
+                <Route path="/portal/canteen" element={<PortalCanteen />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

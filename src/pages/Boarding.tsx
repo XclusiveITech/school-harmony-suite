@@ -1,25 +1,32 @@
 import React, { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Building2, Plus, Edit2, Trash2, Bed, Users, X, Printer } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Bed, Users, X, Printer, History, ArrowRightLeft } from 'lucide-react';
 import ReportHeader from '@/components/ReportHeader';
+import { staff as staffList } from '@/lib/dummy-data';
 import {
-  useHostels, useAllocations,
+  useHostels, useAllocations, useBoardingAudit,
   createHostel, updateHostel, deleteHostel,
   addRoom, updateRoom, deleteRoom,
   hostelCapacity, hostelOccupancy, roomOccupancy, occupiedBedsInRoom,
-  releaseAllocation,
+  releaseAllocation, allocateBed, assignedWardenStaffIds, listVacantBeds,
   type HostelCategory, type Hostel,
 } from '@/lib/boarding-store';
 
 const LEVELS = ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'];
-type Tab = 'dashboard' | 'hostels' | 'rooms' | 'allocations' | 'report';
+type Tab = 'dashboard' | 'hostels' | 'rooms' | 'allocations' | 'audit' | 'report';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'hostels', label: 'Hostels' },
   { id: 'rooms', label: 'Rooms & Beds' },
   { id: 'allocations', label: 'Allocations' },
+  { id: 'audit', label: 'Audit Trail' },
   { id: 'report', label: 'Printable Report' },
 ];
+
+const staffName = (id: string) => {
+  const s = staffList.find(x => x.id === id);
+  return s ? `${s.firstName} ${s.lastName}` : `#${id}`;
+};
 
 export default function Boarding() {
   const location = useLocation();
@@ -57,6 +64,7 @@ export default function Boarding() {
       {tab === 'hostels' && <HostelsTab />}
       {tab === 'rooms' && <RoomsTab />}
       {tab === 'allocations' && <AllocationsTab />}
+      {tab === 'audit' && <AuditTab />}
       {tab === 'report' && <ReportTab hostels={hostels} />}
     </div>
   );
@@ -139,7 +147,11 @@ function HostelsTab() {
                     <span className={`px-2 py-0.5 rounded-full text-xs ${h.category === 'Boys' ? 'bg-blue-500/15 text-blue-600' : 'bg-pink-500/15 text-pink-600'}`}>{h.category}</span>
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">{h.levels.join(', ')}</td>
-                  <td className="px-4 py-2">{h.warden || '—'}</td>
+                  <td className="px-4 py-2 text-xs">
+                    {(h.wardenIds && h.wardenIds.length > 0)
+                      ? h.wardenIds.map(id => staffName(id)).join(', ')
+                      : (h.warden || '—')}
+                  </td>
                   <td className="px-4 py-2">{h.rooms.length}</td>
                   <td className="px-4 py-2">{cap}</td>
                   <td className="px-4 py-2">{occ}</td>
@@ -166,27 +178,37 @@ function HostelDialog({ hostel, onClose }: { hostel?: Hostel; onClose: () => voi
   const [name, setName] = useState(hostel?.name ?? '');
   const [category, setCategory] = useState<HostelCategory>(hostel?.category ?? 'Boys');
   const [levels, setLevels] = useState<string[]>(hostel?.levels ?? ['Form 1']);
-  const [warden, setWarden] = useState(hostel?.warden ?? '');
+  const [wardenIds, setWardenIds] = useState<string[]>(hostel?.wardenIds ?? []);
   const [roomCount, setRoomCount] = useState(8);
   const [roomCapacity, setRoomCapacity] = useState(4);
   const [prefix, setPrefix] = useState('');
 
   const toggleLevel = (lv: string) => setLevels(prev => prev.includes(lv) ? prev.filter(x => x !== lv) : [...prev, lv]);
+  const toggleWarden = (id: string) => setWardenIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  // eligible staff: role contains "Warden" preferred, else any active staff not already assigned elsewhere
+  const takenElsewhere = new Set(assignedWardenStaffIds(hostel?.id));
+  const eligible = staffList.filter(s => s.status === 'Active' && !takenElsewhere.has(s.id));
+  const wardenRoleFirst = [...eligible].sort((a, b) => {
+    const aw = /warden/i.test(a.role) ? 0 : 1;
+    const bw = /warden/i.test(b.role) ? 0 : 1;
+    return aw - bw;
+  });
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || levels.length === 0) return;
     if (isEdit) {
-      updateHostel(hostel!.id, { name, category, levels, warden });
+      updateHostel(hostel!.id, { name, category, levels, wardenIds });
     } else {
-      createHostel({ name, category, levels, warden, roomCount, roomCapacity, prefix });
+      createHostel({ name, category, levels, wardenIds, roomCount, roomCapacity, prefix });
     }
     onClose();
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="bg-card rounded-xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+      <form onSubmit={submit} className="bg-card rounded-xl p-6 w-full max-w-lg shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center">
           <h3 className="font-display font-semibold">{isEdit ? 'Edit Hostel' : 'New Hostel'}</h3>
           <button type="button" onClick={onClose}><X size={18} /></button>
@@ -195,17 +217,29 @@ function HostelDialog({ hostel, onClose }: { hostel?: Hostel; onClose: () => voi
           <label className="text-sm font-medium">Hostel Name</label>
           <input value={name} onChange={e => setName(e.target.value)} className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm" required />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium">Category</label>
-            <select value={category} onChange={e => setCategory(e.target.value as HostelCategory)} className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm">
-              <option>Boys</option><option>Girls</option>
-            </select>
+        <div>
+          <label className="text-sm font-medium">Category</label>
+          <select value={category} onChange={e => setCategory(e.target.value as HostelCategory)} className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm">
+            <option>Boys</option><option>Girls</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-sm font-medium">Wardens (linked from Staff — unassigned only)</label>
+          <div className="mt-2 border border-input rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
+            {wardenRoleFirst.length === 0 && <p className="text-xs text-muted-foreground p-2">No eligible staff available.</p>}
+            {wardenRoleFirst.map(s => {
+              const isWardenRole = /warden/i.test(s.role);
+              return (
+                <label key={s.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer">
+                  <input type="checkbox" checked={wardenIds.includes(s.id)} onChange={() => toggleWarden(s.id)} />
+                  <span className="text-sm">{s.firstName} {s.lastName}</span>
+                  <span className="text-xs text-muted-foreground">· {s.role}</span>
+                  {isWardenRole && <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">Warden role</span>}
+                </label>
+              );
+            })}
           </div>
-          <div>
-            <label className="text-sm font-medium">Warden</label>
-            <input value={warden} onChange={e => setWarden(e.target.value)} className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm" />
-          </div>
+          {wardenIds.length > 0 && <p className="text-xs text-muted-foreground mt-1">{wardenIds.length} warden(s) selected</p>}
         </div>
         <div>
           <label className="text-sm font-medium">Levels (select one or more)</label>
@@ -347,8 +381,31 @@ function AllocationsTab() {
                 <td className="px-4 py-2">{lk?.room.number}</td>
                 <td className="px-4 py-2">#{a.bedNumber}</td>
                 <td className="px-4 py-2 text-muted-foreground">{new Date(a.allocatedAt).toLocaleDateString()}</td>
-                <td className="px-4 py-2 text-right">
-                  <button onClick={() => { if (confirm('Release this allocation?')) releaseAllocation(a.id); }} className="text-xs text-destructive hover:underline">Release</button>
+                <td className="px-4 py-2 text-right space-x-2">
+                  <button
+                    onClick={() => {
+                      const vac = listVacantBeds(a.gender, a.level);
+                      if (vac.length === 0) { alert('No vacant beds for this gender/level.'); return; }
+                      const opts = vac.map((v, i) => `${i + 1}. ${v.hostel.name} · Room ${v.room.number} · Bed #${v.bedNumber}`).join('\n');
+                      const pick = prompt(`Move to bed — enter number:\n${opts}`);
+                      const idx = pick ? parseInt(pick, 10) - 1 : -1;
+                      if (idx < 0 || idx >= vac.length) return;
+                      const reason = prompt('Reason for bed change?') || '';
+                      const v = vac[idx];
+                      allocateBed({
+                        studentId: a.studentId, studentName: a.studentName,
+                        gender: a.gender, level: a.level,
+                        hostelId: v.hostel.id, roomId: v.room.id, bedNumber: v.bedNumber,
+                        source: 'manual', reason,
+                      });
+                    }}
+                    className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                  ><ArrowRightLeft size={12} /> Move</button>
+                  <button onClick={() => {
+                    if (!confirm('Release this allocation?')) return;
+                    const reason = prompt('Reason for release?') || '';
+                    releaseAllocation(a.id, reason);
+                  }} className="text-xs text-destructive hover:underline">Release</button>
                 </td>
               </tr>
             );
@@ -394,6 +451,78 @@ function ReportTab({ hostels }: { hostels: Hostel[] }) {
                 </tr>
               );
             })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Audit Trail Tab -------------------------------------------
+
+function AuditTab() {
+  const events = useBoardingAudit();
+  const hostels = useHostels();
+  const [filter, setFilter] = useState<string>('all');
+
+  const hostelName = (id?: string) => hostels.find(h => h.id === id)?.name || (id ? `#${id}` : '—');
+  const roomNum = (id?: string) => {
+    if (!id) return '—';
+    for (const h of hostels) { const r = h.rooms.find(r => r.id === id); if (r) return r.number; }
+    return `#${id}`;
+  };
+
+  const filtered = filter === 'all' ? events : events.filter(e => e.action === filter);
+
+  const actions: { id: string; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'AUTO_ALLOCATE', label: 'Auto-allocations' },
+    { id: 'MANUAL_ALLOCATE', label: 'Manual allocations' },
+    { id: 'BED_CHANGE', label: 'Bed changes' },
+    { id: 'RELEASE', label: 'Releases' },
+    { id: 'WARDEN_ASSIGN', label: 'Warden assignments' },
+    { id: 'WARDEN_REMOVE', label: 'Warden removals' },
+    { id: 'HOSTEL_CREATE', label: 'Hostel created' },
+    { id: 'HOSTEL_UPDATE', label: 'Hostel updated' },
+    { id: 'HOSTEL_DELETE', label: 'Hostel deleted' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap print:hidden">
+        <label className="text-sm font-medium flex items-center gap-2"><History size={16} /> Filter</label>
+        <select value={filter} onChange={e => setFilter(e.target.value)} className="px-3 py-2 rounded-lg border border-input bg-background text-sm">
+          {actions.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+        </select>
+        <span className="text-xs text-muted-foreground ml-auto">{filtered.length} event(s)</span>
+        <button onClick={() => window.print()} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-input text-sm"><Printer size={14} /> Print</button>
+      </div>
+      <div className="bg-card border border-border rounded-xl shadow-card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr className="text-left">
+              {['When', 'Actor', 'Action', 'Student', 'From', 'To', 'Reason'].map(h => (
+                <th key={h} className="px-3 py-2 font-medium text-muted-foreground">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(e => (
+              <tr key={e.id} className="border-t border-border align-top">
+                <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{new Date(e.at).toLocaleString()}</td>
+                <td className="px-3 py-2">{e.actor}</td>
+                <td className="px-3 py-2"><span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{e.action}</span></td>
+                <td className="px-3 py-2">{e.studentName || e.studentId || '—'}</td>
+                <td className="px-3 py-2 text-xs">
+                  {e.fromHostelId ? `${hostelName(e.fromHostelId)} · ${roomNum(e.fromRoomId)} · Bed #${e.fromBed}` : (e.detail && !e.toHostelId ? e.detail : '—')}
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  {e.toHostelId ? `${hostelName(e.toHostelId)} · ${roomNum(e.toRoomId)} · Bed #${e.toBed}` : '—'}
+                </td>
+                <td className="px-3 py-2 text-xs text-muted-foreground">{e.reason || '—'}</td>
+              </tr>
+            ))}
+            {filtered.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">No audit events</td></tr>}
           </tbody>
         </table>
       </div>
