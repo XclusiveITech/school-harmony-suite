@@ -64,6 +64,7 @@ export default function Boarding() {
       {tab === 'hostels' && <HostelsTab />}
       {tab === 'rooms' && <RoomsTab />}
       {tab === 'allocations' && <AllocationsTab />}
+      {tab === 'audit' && <AuditTab />}
       {tab === 'report' && <ReportTab hostels={hostels} />}
     </div>
   );
