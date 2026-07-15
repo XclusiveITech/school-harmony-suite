@@ -147,7 +147,11 @@ function HostelsTab() {
                     <span className={`px-2 py-0.5 rounded-full text-xs ${h.category === 'Boys' ? 'bg-blue-500/15 text-blue-600' : 'bg-pink-500/15 text-pink-600'}`}>{h.category}</span>
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">{h.levels.join(', ')}</td>
-                  <td className="px-4 py-2">{h.warden || '—'}</td>
+                  <td className="px-4 py-2 text-xs">
+                    {(h.wardenIds && h.wardenIds.length > 0)
+                      ? h.wardenIds.map(id => staffName(id)).join(', ')
+                      : (h.warden || '—')}
+                  </td>
                   <td className="px-4 py-2">{h.rooms.length}</td>
                   <td className="px-4 py-2">{cap}</td>
                   <td className="px-4 py-2">{occ}</td>
