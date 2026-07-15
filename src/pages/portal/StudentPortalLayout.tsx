@@ -4,7 +4,7 @@ import { students, type Student } from '@/lib/dummy-data';
 import { useSchoolSettings } from '@/contexts/SchoolSettingsContext';
 import {
   LayoutDashboard, Receipt, BookOpen, GraduationCap, ClipboardList,
-  Award, Bell, LogOut, ChevronLeft, ChevronRight, Menu, X, Settings, Video
+  Award, Bell, LogOut, ChevronLeft, ChevronRight, Menu, X, Settings, Video, UtensilsCrossed
 } from 'lucide-react';
 import { useState } from 'react';
 
