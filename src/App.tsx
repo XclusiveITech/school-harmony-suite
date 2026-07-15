@@ -126,6 +126,7 @@ const App = () => (
                 <Route path="/transport" element={<Transport />} />
                 <Route path="/transport/:tab" element={<Transport />} />
                 <Route path="/boarding" element={<Boarding />} />
+                <Route path="/canteen" element={<Canteen />} />
                 <Route path="/admin/settings" element={<SchoolSettings />} />
                 <Route path="/admin/branches" element={<BranchManagement />} />
                 <Route path="/admin/roles" element={<PlaceholderPage />} />
