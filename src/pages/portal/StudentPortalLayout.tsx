@@ -19,6 +19,7 @@ const navItems = [
   { to: '/portal/fees', icon: Receipt, label: 'Fees Statement' },
   { to: '/portal/academics', icon: BookOpen, label: 'Academics' },
   { to: '/portal/online-classes', icon: Video, label: 'Online Classes' },
+  { to: '/portal/canteen', icon: UtensilsCrossed, label: 'Canteen' },
   { to: '/portal/assessment', icon: ClipboardList, label: 'Continuous Assessment' },
   { to: '/portal/exams', icon: GraduationCap, label: 'Examinations' },
   { to: '/portal/results', icon: Award, label: 'Results' },
