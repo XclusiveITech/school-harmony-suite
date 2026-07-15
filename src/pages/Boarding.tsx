@@ -178,27 +178,37 @@ function HostelDialog({ hostel, onClose }: { hostel?: Hostel; onClose: () => voi
   const [name, setName] = useState(hostel?.name ?? '');
   const [category, setCategory] = useState<HostelCategory>(hostel?.category ?? 'Boys');
   const [levels, setLevels] = useState<string[]>(hostel?.levels ?? ['Form 1']);
-  const [warden, setWarden] = useState(hostel?.warden ?? '');
+  const [wardenIds, setWardenIds] = useState<string[]>(hostel?.wardenIds ?? []);
   const [roomCount, setRoomCount] = useState(8);
   const [roomCapacity, setRoomCapacity] = useState(4);
   const [prefix, setPrefix] = useState('');
 
   const toggleLevel = (lv: string) => setLevels(prev => prev.includes(lv) ? prev.filter(x => x !== lv) : [...prev, lv]);
+  const toggleWarden = (id: string) => setWardenIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+  // eligible staff: role contains "Warden" preferred, else any active staff not already assigned elsewhere
+  const takenElsewhere = new Set(assignedWardenStaffIds(hostel?.id));
+  const eligible = staffList.filter(s => s.status === 'Active' && !takenElsewhere.has(s.id));
+  const wardenRoleFirst = [...eligible].sort((a, b) => {
+    const aw = /warden/i.test(a.role) ? 0 : 1;
+    const bw = /warden/i.test(b.role) ? 0 : 1;
+    return aw - bw;
+  });
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || levels.length === 0) return;
     if (isEdit) {
-      updateHostel(hostel!.id, { name, category, levels, warden });
+      updateHostel(hostel!.id, { name, category, levels, wardenIds });
     } else {
-      createHostel({ name, category, levels, warden, roomCount, roomCapacity, prefix });
+      createHostel({ name, category, levels, wardenIds, roomCount, roomCapacity, prefix });
     }
     onClose();
   };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="bg-card rounded-xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+      <form onSubmit={submit} className="bg-card rounded-xl p-6 w-full max-w-lg shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center">
           <h3 className="font-display font-semibold">{isEdit ? 'Edit Hostel' : 'New Hostel'}</h3>
           <button type="button" onClick={onClose}><X size={18} /></button>
@@ -207,17 +217,29 @@ function HostelDialog({ hostel, onClose }: { hostel?: Hostel; onClose: () => voi
           <label className="text-sm font-medium">Hostel Name</label>
           <input value={name} onChange={e => setName(e.target.value)} className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm" required />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-sm font-medium">Category</label>
-            <select value={category} onChange={e => setCategory(e.target.value as HostelCategory)} className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm">
-              <option>Boys</option><option>Girls</option>
-            </select>
+        <div>
+          <label className="text-sm font-medium">Category</label>
+          <select value={category} onChange={e => setCategory(e.target.value as HostelCategory)} className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm">
+            <option>Boys</option><option>Girls</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-sm font-medium">Wardens (linked from Staff — unassigned only)</label>
+          <div className="mt-2 border border-input rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
+            {wardenRoleFirst.length === 0 && <p className="text-xs text-muted-foreground p-2">No eligible staff available.</p>}
+            {wardenRoleFirst.map(s => {
+              const isWardenRole = /warden/i.test(s.role);
+              return (
+                <label key={s.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50 cursor-pointer">
+                  <input type="checkbox" checked={wardenIds.includes(s.id)} onChange={() => toggleWarden(s.id)} />
+                  <span className="text-sm">{s.firstName} {s.lastName}</span>
+                  <span className="text-xs text-muted-foreground">· {s.role}</span>
+                  {isWardenRole && <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">Warden role</span>}
+                </label>
+              );
+            })}
           </div>
-          <div>
-            <label className="text-sm font-medium">Warden</label>
-            <input value={warden} onChange={e => setWarden(e.target.value)} className="w-full mt-1 px-3 py-2 rounded-lg border border-input bg-background text-sm" />
-          </div>
+          {wardenIds.length > 0 && <p className="text-xs text-muted-foreground mt-1">{wardenIds.length} warden(s) selected</p>}
         </div>
         <div>
           <label className="text-sm font-medium">Levels (select one or more)</label>
