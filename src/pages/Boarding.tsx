@@ -457,3 +457,75 @@ function ReportTab({ hostels }: { hostels: Hostel[] }) {
     </div>
   );
 }
+
+// ---------- Audit Trail Tab -------------------------------------------
+
+function AuditTab() {
+  const events = useBoardingAudit();
+  const hostels = useHostels();
+  const [filter, setFilter] = useState<string>('all');
+
+  const hostelName = (id?: string) => hostels.find(h => h.id === id)?.name || (id ? `#${id}` : '—');
+  const roomNum = (id?: string) => {
+    if (!id) return '—';
+    for (const h of hostels) { const r = h.rooms.find(r => r.id === id); if (r) return r.number; }
+    return `#${id}`;
+  };
+
+  const filtered = filter === 'all' ? events : events.filter(e => e.action === filter);
+
+  const actions: { id: string; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'AUTO_ALLOCATE', label: 'Auto-allocations' },
+    { id: 'MANUAL_ALLOCATE', label: 'Manual allocations' },
+    { id: 'BED_CHANGE', label: 'Bed changes' },
+    { id: 'RELEASE', label: 'Releases' },
+    { id: 'WARDEN_ASSIGN', label: 'Warden assignments' },
+    { id: 'WARDEN_REMOVE', label: 'Warden removals' },
+    { id: 'HOSTEL_CREATE', label: 'Hostel created' },
+    { id: 'HOSTEL_UPDATE', label: 'Hostel updated' },
+    { id: 'HOSTEL_DELETE', label: 'Hostel deleted' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 flex-wrap print:hidden">
+        <label className="text-sm font-medium flex items-center gap-2"><History size={16} /> Filter</label>
+        <select value={filter} onChange={e => setFilter(e.target.value)} className="px-3 py-2 rounded-lg border border-input bg-background text-sm">
+          {actions.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+        </select>
+        <span className="text-xs text-muted-foreground ml-auto">{filtered.length} event(s)</span>
+        <button onClick={() => window.print()} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-input text-sm"><Printer size={14} /> Print</button>
+      </div>
+      <div className="bg-card border border-border rounded-xl shadow-card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr className="text-left">
+              {['When', 'Actor', 'Action', 'Student', 'From', 'To', 'Reason'].map(h => (
+                <th key={h} className="px-3 py-2 font-medium text-muted-foreground">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(e => (
+              <tr key={e.id} className="border-t border-border align-top">
+                <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">{new Date(e.at).toLocaleString()}</td>
+                <td className="px-3 py-2">{e.actor}</td>
+                <td className="px-3 py-2"><span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{e.action}</span></td>
+                <td className="px-3 py-2">{e.studentName || e.studentId || '—'}</td>
+                <td className="px-3 py-2 text-xs">
+                  {e.fromHostelId ? `${hostelName(e.fromHostelId)} · ${roomNum(e.fromRoomId)} · Bed #${e.fromBed}` : (e.detail && !e.toHostelId ? e.detail : '—')}
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  {e.toHostelId ? `${hostelName(e.toHostelId)} · ${roomNum(e.toRoomId)} · Bed #${e.toBed}` : '—'}
+                </td>
+                <td className="px-3 py-2 text-xs text-muted-foreground">{e.reason || '—'}</td>
+              </tr>
+            ))}
+            {filtered.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">No audit events</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
