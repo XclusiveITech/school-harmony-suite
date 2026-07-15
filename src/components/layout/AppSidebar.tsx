@@ -146,7 +146,21 @@ export const navItems: NavItem[] = [
       { label: 'Hostels', path: '/boarding#hostels' },
       { label: 'Rooms & Beds', path: '/boarding#rooms' },
       { label: 'Allocations', path: '/boarding#allocations' },
+      { label: 'Audit Trail', path: '/boarding#audit' },
       { label: 'Printable Report', path: '/boarding#report' },
+    ]
+  },
+  {
+    label: 'Canteen', icon: <UtensilsCrossed size={20} />,
+    children: [
+      { label: 'Dashboard', path: '/canteen#dashboard' },
+      { label: 'Dining Halls', path: '/canteen#halls' },
+      { label: 'Meals Chart', path: '/canteen#meals' },
+      { label: 'Staff', path: '/canteen#staff' },
+      { label: 'Stock Transfers', path: '/canteen#transfers' },
+      { label: 'Requisitions', path: '/canteen#requisitions' },
+      { label: 'Reviews', path: '/canteen#reviews' },
+      { label: 'Audit Trail', path: '/canteen#audit' },
     ]
   },
   {
