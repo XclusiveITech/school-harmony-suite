@@ -36,6 +36,8 @@ import Requisitions from "@/pages/Requisitions";
 import OnlineClasses from "@/pages/OnlineClasses";
 import Transport from "@/pages/Transport";
 import Boarding from "@/pages/Boarding";
+import Canteen from "@/pages/Canteen";
+import PortalCanteen from "@/pages/portal/PortalCanteen";
 import PortalOnlineClasses from "@/pages/portal/PortalOnlineClasses";
 import Subjects from "@/pages/academics/Subjects";
 import Classes from "@/pages/academics/Classes";
