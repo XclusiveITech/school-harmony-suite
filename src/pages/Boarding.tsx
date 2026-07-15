@@ -1,25 +1,32 @@
 import React, { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Building2, Plus, Edit2, Trash2, Bed, Users, X, Printer } from 'lucide-react';
+import { Building2, Plus, Edit2, Trash2, Bed, Users, X, Printer, History, ArrowRightLeft } from 'lucide-react';
 import ReportHeader from '@/components/ReportHeader';
+import { staff as staffList } from '@/lib/dummy-data';
 import {
-  useHostels, useAllocations,
+  useHostels, useAllocations, useBoardingAudit,
   createHostel, updateHostel, deleteHostel,
   addRoom, updateRoom, deleteRoom,
   hostelCapacity, hostelOccupancy, roomOccupancy, occupiedBedsInRoom,
-  releaseAllocation,
+  releaseAllocation, allocateBed, assignedWardenStaffIds, listVacantBeds,
   type HostelCategory, type Hostel,
 } from '@/lib/boarding-store';
 
 const LEVELS = ['Form 1', 'Form 2', 'Form 3', 'Form 4', 'Form 5', 'Form 6'];
-type Tab = 'dashboard' | 'hostels' | 'rooms' | 'allocations' | 'report';
+type Tab = 'dashboard' | 'hostels' | 'rooms' | 'allocations' | 'audit' | 'report';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'hostels', label: 'Hostels' },
   { id: 'rooms', label: 'Rooms & Beds' },
   { id: 'allocations', label: 'Allocations' },
+  { id: 'audit', label: 'Audit Trail' },
   { id: 'report', label: 'Printable Report' },
 ];
+
+const staffName = (id: string) => {
+  const s = staffList.find(x => x.id === id);
+  return s ? `${s.firstName} ${s.lastName}` : `#${id}`;
+};
 
 export default function Boarding() {
   const location = useLocation();
