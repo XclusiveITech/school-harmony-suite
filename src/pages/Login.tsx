@@ -11,16 +11,20 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (login(email, password)) {
+    setLoading(true);
+    const ok = await login(email, password);
+    setLoading(false);
+    if (ok) {
       navigate('/dashboard');
     } else {
-      setError('Invalid email or password');
+      setError('Invalid email or password, or backend not reachable at ' + (import.meta.env.VITE_API_URL || 'http://localhost:8000'));
     }
   };
 
@@ -102,18 +106,19 @@ export default function Login() {
             </div>
             <button
               type="submit"
-              className="w-full py-2.5 rounded-lg gradient-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+              disabled={loading}
+              className="w-full py-2.5 rounded-lg gradient-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
             >
-              Sign In
+              {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
 
           <div className="mt-8 p-4 rounded-lg bg-muted">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">Demo Credentials:</p>
+            <p className="text-xs font-semibold text-muted-foreground mb-2">Superadmin (Django backend):</p>
             <div className="space-y-1 text-xs text-muted-foreground">
-              <p><span className="font-medium text-foreground">Admin:</span> admin@brainstar.edu / admin123</p>
-              <p><span className="font-medium text-foreground">Teacher:</span> teacher@brainstar.edu / test123</p>
-              <p><span className="font-medium text-foreground">Accountant:</span> accountant@brainstar.edu / test123</p>
+              <p><span className="font-medium text-foreground">Email:</span> superadmin@gmail.com</p>
+              <p><span className="font-medium text-foreground">Password:</span> #02Nyasha0505</p>
+              <p className="pt-1">Backend must be running at <span className="font-mono text-foreground">{import.meta.env.VITE_API_URL || 'http://localhost:8000'}</span></p>
             </div>
           </div>
 
