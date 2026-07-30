@@ -29,104 +29,78 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left side - branding */}
-      <div className="hidden lg:flex lg:w-1/2 gradient-primary items-center justify-center p-12">
-        <div className="text-center max-w-md animate-fade-in">
-          <div className="w-20 h-20 rounded-2xl bg-primary-foreground/20 backdrop-blur flex items-center justify-center mx-auto mb-8">
-            <Landmark size={40} className="text-primary-foreground" />
-          </div>
-          <h1 className="font-display text-4xl font-bold text-primary-foreground mb-4">Brainstar SMS</h1>
-          <p className="text-primary-foreground/80 text-lg">Complete School Management System</p>
-          <div className="mt-10 grid grid-cols-3 gap-4 text-primary-foreground/70 text-sm">
-            <div className="bg-primary-foreground/10 rounded-xl p-4">
-              <p className="font-semibold text-2xl text-primary-foreground">500+</p>
-              <p>Students</p>
-            </div>
-            <div className="bg-primary-foreground/10 rounded-xl p-4">
-              <p className="font-semibold text-2xl text-primary-foreground">50+</p>
-              <p>Staff</p>
-            </div>
-            <div className="bg-primary-foreground/10 rounded-xl p-4">
-              <p className="font-semibold text-2xl text-primary-foreground">15+</p>
-              <p>Modules</p>
-            </div>
-          </div>
-        </div>
+    <div className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden gradient-primary">
+      {/* Background brand watermark */}
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center select-none">
+        <Landmark className="text-primary-foreground/10" size={320} strokeWidth={1} />
+        <span className="font-display font-bold text-primary-foreground/10 text-[14vw] leading-none -mt-10 tracking-tight">
+          BRAINSTAR
+        </span>
       </div>
+      <div className="pointer-events-none absolute -top-32 -left-32 w-96 h-96 rounded-full bg-primary-foreground/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-32 -right-32 w-96 h-96 rounded-full bg-primary-foreground/10 blur-3xl" />
 
-      {/* Right side - form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
-        <div className="w-full max-w-md animate-fade-in">
-          <div className="lg:hidden flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-              <Landmark size={22} className="text-primary-foreground" />
-            </div>
-            <h1 className="font-display text-xl font-bold text-foreground">Brainstar</h1>
+      {/* Glass login card */}
+      <div className="relative w-full max-w-md rounded-2xl border border-primary-foreground/25 bg-primary-foreground/10 backdrop-blur-xl shadow-2xl p-8 animate-fade-in">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-11 h-11 rounded-xl bg-primary-foreground/20 backdrop-blur flex items-center justify-center">
+            <Landmark size={22} className="text-primary-foreground" />
           </div>
+          <h1 className="font-display text-xl font-bold text-primary-foreground">Brainstar SMS</h1>
+        </div>
 
-          <h2 className="font-display text-2xl font-bold text-foreground mb-1">Welcome back</h2>
-          <p className="text-muted-foreground mb-8">Sign in to your staff portal</p>
+        <h2 className="font-display text-2xl font-bold text-primary-foreground mb-1">Welcome back</h2>
+        <p className="text-primary-foreground/70 mb-8">Sign in to your staff portal</p>
 
-          {error && (
-            <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
-          )}
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-destructive/20 border border-destructive/40 text-primary-foreground text-sm">{error}</div>
+        )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-primary-foreground mb-1.5">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@brainstar.edu"
+              className="w-full px-4 py-2.5 rounded-lg border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground placeholder:text-primary-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary-foreground/50"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-primary-foreground mb-1.5">Password</label>
+            <div className="relative">
               <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="admin@brainstar.edu"
-                className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full px-4 py-2.5 rounded-lg border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground placeholder:text-primary-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary-foreground/50 pr-10"
                 required
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full px-4 py-2.5 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary pr-10"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 rounded-lg gradient-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
-            >
-              {loading ? 'Signing in…' : 'Sign In'}
-            </button>
-          </form>
-
-          <div className="mt-8 p-4 rounded-lg bg-muted">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">Superadmin (Django backend):</p>
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <p><span className="font-medium text-foreground">Email:</span> superadmin@gmail.com</p>
-              <p><span className="font-medium text-foreground">Password:</span> #02Nyasha0505</p>
-              <p className="pt-1">Backend must be running at <span className="font-mono text-foreground">{import.meta.env.VITE_API_URL || 'http://localhost:8000'}</span></p>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-primary-foreground/70"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2.5 rounded-lg bg-primary-foreground text-primary font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
+          >
+            {loading ? 'Signing in…' : 'Sign In'}
+          </button>
+        </form>
 
-          <div className="mt-4">
-            <Link to="/portal/login" className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border-2 border-[hsl(142_71%_45%)] text-[hsl(142_71%_45%)] font-semibold hover:bg-[hsl(142_71%_45%)]/10 transition-colors text-sm">
-              <GraduationCap size={18} /> Go to Student Portal
-            </Link>
-          </div>
+        <div className="mt-6">
+          <Link to="/portal/login" className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-primary-foreground/40 text-primary-foreground font-semibold hover:bg-primary-foreground/10 transition-colors text-sm">
+            <GraduationCap size={18} /> Go to Student Portal
+          </Link>
         </div>
       </div>
     </div>
