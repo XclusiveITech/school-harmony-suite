@@ -33,10 +33,10 @@ export default function Login() {
       {/* Subtle navy gradient overlay */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-slate-900 via-[#0B1426] to-[#071124]" />
 
-      {/* Background brand watermark */}
+      {/* Background brand watermark — faint and centered */}
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center select-none">
-        <Landmark className="text-white/5" size={320} strokeWidth={1} />
-        <span className="font-display font-bold text-white/5 text-[14vw] leading-none -mt-10 tracking-tight">
+        <Landmark className="text-white/[0.04]" size={260} strokeWidth={0.8} />
+        <span className="font-display font-bold text-white/[0.03] text-[13vw] leading-none -mt-8 tracking-tight text-center">
           BRAINSTAR
         </span>
       </div>
