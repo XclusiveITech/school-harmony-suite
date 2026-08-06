@@ -6,9 +6,18 @@ import TopBar from './TopBar';
 import ModuleBreadcrumbs from './ModuleBreadcrumbs';
 
 export default function AppLayout() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">
+        Loading…
+      </div>
+    );
+  }
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
