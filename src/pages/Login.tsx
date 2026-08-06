@@ -5,7 +5,7 @@ import { Landmark, Eye, EyeOff, GraduationCap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Login() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, error: authError } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,9 +24,10 @@ export default function Login() {
     if (ok) {
       navigate('/dashboard');
     } else {
-      setError('Invalid email or password, or backend not reachable at ' + (import.meta.env.VITE_API_URL || 'http://localhost:8000'));
+      setError(authError || 'Invalid email or password.');
     }
   };
+
 
   return (
     <div className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden bg-slate-950">
