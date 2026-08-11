@@ -6,6 +6,7 @@ import {
   useHostels, useAllocations, findFreeBed, listVacantBeds, allocateBed,
   type HostelCategory,
 } from '@/lib/boarding-store';
+import { createStudent, defaultBranchId } from '@/lib/students-api';
 
 export default function EnrollStudent() {
   const navigate = useNavigate();
@@ -16,6 +17,8 @@ export default function EnrollStudent() {
     parentPhone: '', address: '',
   });
   const [saved, setSaved] = useState<{ regNumber: string; username: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const update = (key: string, val: string) => setForm(prev => ({ ...prev, [key]: val }));
 
@@ -41,18 +44,43 @@ export default function EnrollStudent() {
   const pickedHostel = pick && hostels.find(h => h.id === pick.hostelId);
   const pickedRoom = pickedHostel?.rooms.find(r => r.id === pick!.roomId);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setSaving(true);
     const regNumber = generateRegNumber(form.firstName, form.lastName);
-    if (isBoarding && pick) {
-      allocateBed({
-        studentId: regNumber,
-        studentName: `${form.firstName} ${form.lastName}`,
-        gender: genderCat, level: form.level,
-        hostelId: pick.hostelId, roomId: pick.roomId, bedNumber: pick.bedNumber,
+    try {
+      const branch = await defaultBranchId();
+      if (!branch) throw new Error('No branch found in the database. Create a branch first.');
+      await createStudent({
+        student_no: regNumber,
+        first_name: form.firstName,
+        last_name: form.lastName,
+        gender: form.gender,
+        date_of_birth: form.dateOfBirth || null,
+        branch,
+        level: form.level,
+        class_name: form.className,
+        residence: isBoarding ? 'Boarding' : 'Day',
+        status: 'Active',
+        guardian_name: form.parentName,
+        guardian_phone: form.parentPhone,
+        guardian_email: form.parentEmail,
       });
+      if (isBoarding && pick) {
+        allocateBed({
+          studentId: regNumber,
+          studentName: `${form.firstName} ${form.lastName}`,
+          gender: genderCat, level: form.level,
+          hostelId: pick.hostelId, roomId: pick.roomId, bedNumber: pick.bedNumber,
+        });
+      }
+      setSaved({ regNumber, username: regNumber });
+    } catch (err: any) {
+      setError(err?.message || 'Could not save the student to the database.');
+    } finally {
+      setSaving(false);
     }
-    setSaved({ regNumber, username: regNumber });
   };
 
   if (saved) {
@@ -198,9 +226,13 @@ export default function EnrollStudent() {
           </div>
         </div>
 
+        {error && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
+        )}
+
         <div className="flex justify-end pt-2">
-          <button type="submit" className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg gradient-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity">
-            <Save size={18} /> Save & Create Accounts
+          <button type="submit" disabled={saving} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg gradient-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-60">
+            <Save size={18} /> {saving ? 'Saving to database…' : 'Save & Create Accounts'}
           </button>
         </div>
       </form>
