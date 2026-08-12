@@ -11,6 +11,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Students from "@/pages/Students";
+import Attendance from "@/pages/Attendance";
 import EnrollStudent from "@/pages/EnrollStudent";
 import GeneralLedger from "@/pages/finance/GeneralLedger";
 import Cashbook from "@/pages/finance/Cashbook";
@@ -83,7 +84,7 @@ const App = () => (
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/students" element={<Students />} />
                 <Route path="/students/enroll" element={<EnrollStudent />} />
-                <Route path="/attendance" element={<PlaceholderPage />} />
+                <Route path="/attendance" element={<Attendance />} />
                 <Route path="/academics/subjects" element={<Subjects />} />
                 <Route path="/academics/classes" element={<Classes />} />
                 <Route path="/academics/timetable" element={<PlaceholderPage />} />
