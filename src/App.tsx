@@ -43,6 +43,7 @@ import PortalOnlineClasses from "@/pages/portal/PortalOnlineClasses";
 import Subjects from "@/pages/academics/Subjects";
 import Classes from "@/pages/academics/Classes";
 import ContinuousAssessment from "@/pages/academics/ContinuousAssessment";
+import Examinations from "@/pages/academics/Examinations";
 import PlaceholderPage from "@/pages/PlaceholderPage";
 import SchoolSettings from "@/pages/admin/SchoolSettings";
 import BranchManagement from "@/pages/admin/BranchManagement";
@@ -89,11 +90,11 @@ const App = () => (
                 <Route path="/academics/classes" element={<Classes />} />
                 <Route path="/academics/timetable" element={<PlaceholderPage />} />
                 <Route path="/academics/assessment" element={<ContinuousAssessment />} />
-                <Route path="/exams/types" element={<PlaceholderPage />} />
-                <Route path="/exams/schedule" element={<PlaceholderPage />} />
-                <Route path="/exams/marks" element={<PlaceholderPage />} />
-                <Route path="/exams/results" element={<PlaceholderPage />} />
-                <Route path="/exams/evaluation" element={<PlaceholderPage />} />
+                <Route path="/exams/types" element={<Examinations />} />
+                <Route path="/exams/schedule" element={<Examinations />} />
+                <Route path="/exams/marks" element={<Examinations />} />
+                <Route path="/exams/results" element={<Examinations />} />
+                <Route path="/exams/evaluation" element={<Examinations />} />
                 <Route path="/finance/gl" element={<GeneralLedger />} />
                 <Route path="/finance/cashbook" element={<Cashbook />} />
                 <Route path="/finance/journals" element={<Journals />} />
