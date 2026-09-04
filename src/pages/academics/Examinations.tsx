@@ -32,7 +32,11 @@ export default function Examinations() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [tab, setTab] = useState(TAB_BY_HASH[window.location.hash] || 'schedule');
+  const pathTab = window.location.pathname.split('/').pop() || '';
+  const [tab, setTab] = useState(
+    TAB_BY_HASH[window.location.hash] ||
+    (['types', 'schedule', 'marks', 'results'].includes(pathTab) ? pathTab : 'schedule'),
+  );
   const [filterClass, setFilterClass] = useState('');
   const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
   const [drafts, setDrafts] = useState<Record<number, { mark: string; comment: string }>>({});
