@@ -1,18 +1,29 @@
-// Brainstar Tuckshop module – POS, shifts, cashup, prices.
-// Integrates with inventory-store via SALE / SALE_RETURN / WASTAGE movements
-// posted against the dedicated TUCKSHOP_WAREHOUSE_ID warehouse.
+// Brainstar Tuckshop module – POS, shifts, cashup, prices, wastage.
+// Backed entirely by the Django/MySQL backend (see BACKEND_TUCKSHOP.md).
+// This module keeps a small in-memory cache so components can render
+// synchronously, but every read comes from the API and every write is
+// persisted through it before the cache is refreshed.
 
 import { useSyncExternalStore } from 'react';
-import {
-  TUCKSHOP_WAREHOUSE_ID, postSale, postSaleReturn, postWastage,
-  getStockOnHand,
-} from './inventory-store';
+import * as apiT from './tuckshop-api';
+import { num } from './tuckshop-api';
 import {
   postTuckshopSale, postTuckshopRefund, postTuckshopWastage,
 } from './accounting-store';
 
-export type PaymentMethod = 'Cash' | 'Student Card' | 'Parent Account';
-export type SaleStatus = 'Completed' | 'Voided' | 'Refunded';
+export type PaymentMethod = apiT.PaymentMethod;
+export type SaleStatus = apiT.SaleStatus;
+
+export interface TuckProduct {
+  id: string;
+  sku: string;
+  name: string;
+  barcode?: string;
+  unitCost: number;
+  sellingPrice: number;
+  stock: number;
+  reorderLevel: number;
+}
 
 export interface PriceListEntry {
   productId: string;
@@ -29,7 +40,7 @@ export interface TuckSaleLine {
 export interface TuckSale {
   id: string;
   ref: string;
-  date: string;        // ISO datetime
+  date: string;
   shiftId: string;
   operator: string;
   paymentMethod: PaymentMethod;
@@ -56,16 +67,31 @@ export interface Shift {
   notes?: string;
 }
 
+export interface WastageRecord {
+  id: string;
+  ref: string;
+  date: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  reason: string;
+  cost: number;
+}
+
 interface TuckState {
+  products: TuckProduct[];
   prices: PriceListEntry[];
   sales: TuckSale[];
   shifts: Shift[];
+  wastage: WastageRecord[];
+  loading: boolean;
+  error: string | null;
+  loadedAt: string | null;
 }
 
 let state: TuckState = {
-  prices: [],
-  sales: [],
-  shifts: [],
+  products: [], prices: [], sales: [], shifts: [], wastage: [],
+  loading: false, error: null, loadedAt: null,
 };
 
 const listeners = new Set<() => void>();
@@ -78,34 +104,114 @@ export function useTuckshop<T>(selector: (s: TuckState) => T): T {
   return useSyncExternalStore(subscribe, () => selector(getState()), () => selector(state));
 }
 
-const counters = { S: 0, SH: 0 };
-const newRef = (p: 'S' | 'SH') => `${p}-${(++counters[p]).toString().padStart(4, '0')}`;
-const newId = () => Math.random().toString(36).slice(2, 10);
+/* ------------------------------- Mappers -------------------------------- */
 
-// ---------- Prices ----------
-export function setPrice(productId: string, sellingPrice: number) {
-  set(s => {
-    const existing = s.prices.find(p => p.productId === productId);
-    return {
+const mapProduct = (p: apiT.BackendTuckProduct): TuckProduct => ({
+  id: String(p.id),
+  sku: p.sku,
+  name: p.name,
+  barcode: p.barcode ?? undefined,
+  unitCost: num(p.unit_cost),
+  sellingPrice: num(p.selling_price),
+  stock: num(p.stock),
+  reorderLevel: num(p.reorder_level),
+});
+
+const mapSale = (s: apiT.BackendSale): TuckSale => ({
+  id: String(s.id),
+  ref: s.ref,
+  date: s.date,
+  shiftId: s.shift != null ? String(s.shift) : '',
+  operator: s.operator,
+  paymentMethod: s.payment_method,
+  studentId: s.student_id ?? undefined,
+  studentName: s.student_name ?? undefined,
+  lines: (s.lines ?? []).map(l => ({
+    productId: String(l.product),
+    quantity: num(l.quantity),
+    unitPrice: num(l.unit_price),
+    unitCost: num(l.unit_cost),
+  })),
+  subtotal: num(s.subtotal),
+  cogs: num(s.cogs),
+  status: s.status,
+  voidReason: s.void_reason ?? undefined,
+});
+
+const mapShift = (s: apiT.BackendShift): Shift => ({
+  id: String(s.id),
+  ref: s.ref,
+  operator: s.operator,
+  openedAt: s.opened_at,
+  closedAt: s.closed_at ?? undefined,
+  openingCash: num(s.opening_cash),
+  declaredCash: s.declared_cash == null ? undefined : num(s.declared_cash),
+  expectedCash: s.expected_cash == null ? undefined : num(s.expected_cash),
+  variance: s.variance == null ? undefined : num(s.variance),
+  status: s.status,
+  notes: s.notes ?? undefined,
+});
+
+const mapWastage = (w: apiT.BackendWastage): WastageRecord => ({
+  id: String(w.id),
+  ref: w.ref,
+  date: w.date,
+  productId: String(w.product),
+  productName: w.product_name ?? String(w.product),
+  quantity: num(w.quantity),
+  reason: w.reason,
+  cost: num(w.cost),
+});
+
+/* -------------------------------- Loading ------------------------------- */
+
+export async function loadTuckshop(): Promise<void> {
+  set(s => ({ ...s, loading: true, error: null }));
+  try {
+    const [products, shifts, sales, wastage] = await Promise.all([
+      apiT.listProducts(), apiT.listShifts(), apiT.listSales(), apiT.listWastage(),
+    ]);
+    const mapped = products.map(mapProduct);
+    set(s => ({
       ...s,
-      prices: existing
-        ? s.prices.map(p => p.productId === productId ? { ...p, sellingPrice } : p)
-        : [...s.prices, { productId, sellingPrice }],
-    };
-  });
+      products: mapped,
+      prices: mapped.map(p => ({ productId: p.id, sellingPrice: p.sellingPrice })),
+      shifts: shifts.map(mapShift),
+      sales: sales.map(mapSale),
+      wastage: wastage.map(mapWastage),
+      loading: false,
+      loadedAt: new Date().toISOString(),
+    }));
+  } catch (e: any) {
+    set(s => ({ ...s, loading: false, error: e?.message || 'Failed to load tuckshop data' }));
+  }
+}
+
+/* -------------------------------- Prices -------------------------------- */
+
+export async function setPrice(productId: string, sellingPrice: number) {
+  await apiT.setSellingPrice(Number(productId), sellingPrice);
+  set(s => ({
+    ...s,
+    products: s.products.map(p => p.id === productId ? { ...p, sellingPrice } : p),
+    prices: s.prices.some(p => p.productId === productId)
+      ? s.prices.map(p => p.productId === productId ? { ...p, sellingPrice } : p)
+      : [...s.prices, { productId, sellingPrice }],
+  }));
 }
 
 export function getPrice(productId: string): number {
-  return state.prices.find(p => p.productId === productId)?.sellingPrice ?? 0;
+  return state.products.find(p => p.id === productId)?.sellingPrice ?? 0;
 }
 
-// ---------- Shifts ----------
-export function openShift(operator: string, openingCash: number): Shift {
-  const sh: Shift = {
-    id: newId(), ref: newRef('SH'), operator,
-    openedAt: new Date().toISOString(),
-    openingCash, status: 'Open',
-  };
+export function getTuckStockOnHand(productId: string): number {
+  return state.products.find(p => p.id === productId)?.stock ?? 0;
+}
+
+/* -------------------------------- Shifts -------------------------------- */
+
+export async function openShift(operator: string, openingCash: number): Promise<Shift> {
+  const sh = mapShift(await apiT.openShift(operator, openingCash));
   set(s => ({ ...s, shifts: [sh, ...s.shifts] }));
   return sh;
 }
@@ -114,143 +220,100 @@ export function getActiveShift(operator?: string): Shift | undefined {
   return state.shifts.find(s => s.status === 'Open' && (!operator || s.operator === operator));
 }
 
-export function closeShift(shiftId: string, declaredCash: number, notes?: string): Shift | undefined {
-  const cashSales = state.sales
-    .filter(x => x.shiftId === shiftId && x.status === 'Completed' && x.paymentMethod === 'Cash')
-    .reduce((sum, x) => sum + x.subtotal, 0);
-  const refunds = state.sales
-    .filter(x => x.shiftId === shiftId && x.status === 'Refunded' && x.paymentMethod === 'Cash')
-    .reduce((sum, x) => sum + x.subtotal, 0);
-  let updated: Shift | undefined;
-  set(s => ({
-    ...s,
-    shifts: s.shifts.map(sh => {
-      if (sh.id !== shiftId) return sh;
-      const expected = sh.openingCash + cashSales - refunds;
-      updated = {
-        ...sh,
-        closedAt: new Date().toISOString(),
-        declaredCash,
-        expectedCash: expected,
-        variance: declaredCash - expected,
-        status: 'Closed',
-        notes,
-      };
-      return updated;
-    }),
-  }));
+export async function closeShift(shiftId: string, declaredCash: number, notes?: string): Promise<Shift | undefined> {
+  const updated = mapShift(await apiT.closeShift(Number(shiftId), declaredCash, notes));
+  set(s => ({ ...s, shifts: s.shifts.map(sh => sh.id === shiftId ? updated : sh) }));
   return updated;
 }
 
-// ---------- Sales ----------
-export function recordSale(input: {
+/* --------------------------------- Sales -------------------------------- */
+
+export async function recordSale(input: {
   shiftId: string; operator: string;
   paymentMethod: PaymentMethod;
   studentId?: string; studentName?: string;
   lines: { productId: string; quantity: number; unitPrice: number }[];
-}): { ok: boolean; error?: string; sale?: TuckSale } {
-  // stock validation handled by postSale
-  const date = new Date().toISOString();
-  const ref = newRef('S');
-  const result = postSale({
-    date: date.slice(0, 10),
-    warehouseId: TUCKSHOP_WAREHOUSE_ID,
-    ref,
-    lines: input.lines,
-  });
-  if (!result.ok) return { ok: false, error: result.error };
-
-  const subtotal = input.lines.reduce((s, l) => s + l.quantity * l.unitPrice, 0);
-  // Distribute cogs proportionally
-  const totalQty = input.lines.reduce((s, l) => s + l.quantity, 0);
-  const lines: TuckSaleLine[] = input.lines.map(l => ({
-    productId: l.productId,
-    quantity: l.quantity,
-    unitPrice: l.unitPrice,
-    unitCost: totalQty ? (result.cogs ?? 0) * (l.quantity / totalQty) / l.quantity : 0,
-  }));
-  const sale: TuckSale = {
-    id: newId(), ref, date,
-    shiftId: input.shiftId, operator: input.operator,
-    paymentMethod: input.paymentMethod,
-    studentId: input.studentId, studentName: input.studentName,
-    lines, subtotal, cogs: result.cogs ?? 0,
-    status: 'Completed',
-  };
-  set(s => ({ ...s, sales: [sale, ...s.sales] }));
-  postTuckshopSale({
-    date, saleRef: ref, paymentMethod: input.paymentMethod,
-    amount: subtotal, cogs: result.cogs ?? 0, studentName: input.studentName,
-  });
-  return { ok: true, sale };
-}
-
-export function voidSale(saleId: string, reason: string): { ok: boolean; error?: string } {
-  const sale = state.sales.find(s => s.id === saleId);
-  if (!sale) return { ok: false, error: 'Sale not found' };
-  if (sale.status !== 'Completed') return { ok: false, error: 'Only completed sales can be voided' };
-  // Return stock
-  postSaleReturn({
-    date: new Date().toISOString().slice(0, 10),
-    warehouseId: TUCKSHOP_WAREHOUSE_ID,
-    ref: `${sale.ref}-VOID`,
-    lines: sale.lines.map(l => ({ productId: l.productId, quantity: l.quantity, unitCost: l.unitCost })),
-  });
-  set(s => ({
-    ...s,
-    sales: s.sales.map(x => x.id === saleId ? { ...x, status: 'Voided', voidReason: reason } : x),
-  }));
-  postTuckshopRefund({
-    date: new Date().toISOString(), saleRef: sale.ref, kind: 'Void',
-    paymentMethod: sale.paymentMethod, amount: sale.subtotal, cogs: sale.cogs,
-  });
-  return { ok: true };
-}
-
-export function refundSale(saleId: string, reason: string): { ok: boolean; error?: string } {
-  const sale = state.sales.find(s => s.id === saleId);
-  if (!sale) return { ok: false, error: 'Sale not found' };
-  if (sale.status !== 'Completed') return { ok: false, error: 'Only completed sales can be refunded' };
-  postSaleReturn({
-    date: new Date().toISOString().slice(0, 10),
-    warehouseId: TUCKSHOP_WAREHOUSE_ID,
-    ref: `${sale.ref}-RFND`,
-    lines: sale.lines.map(l => ({ productId: l.productId, quantity: l.quantity, unitCost: l.unitCost })),
-  });
-  set(s => ({
-    ...s,
-    sales: s.sales.map(x => x.id === saleId ? { ...x, status: 'Refunded', voidReason: reason } : x),
-  }));
-  postTuckshopRefund({
-    date: new Date().toISOString(), saleRef: sale.ref, kind: 'Refund',
-    paymentMethod: sale.paymentMethod, amount: sale.subtotal, cogs: sale.cogs,
-  });
-  return { ok: true };
-}
-
-// ---------- Wastage ----------
-export function recordWastage(input: { lines: { productId: string; quantity: number; reason: string }[] }) {
-  const ref = `WST-${Date.now()}`;
-  const result = postWastage({
-    date: new Date().toISOString().slice(0, 10),
-    warehouseId: TUCKSHOP_WAREHOUSE_ID,
-    ref,
-    lines: input.lines,
-  });
-  if (result.ok) {
-    postTuckshopWastage({
-      date: new Date().toISOString(),
-      ref,
-      cost: result.cogs ?? 0,
-      reason: input.lines.map(l => l.reason).filter(Boolean).join('; '),
+}): Promise<{ ok: boolean; error?: string; sale?: TuckSale }> {
+  try {
+    const created = await apiT.createSale({
+      shift: input.shiftId ? Number(input.shiftId) : null,
+      operator: input.operator,
+      payment_method: input.paymentMethod,
+      student_id: input.studentId,
+      student_name: input.studentName,
+      lines: input.lines.map(l => ({
+        product: Number(l.productId), quantity: l.quantity, unit_price: l.unitPrice,
+      })),
     });
+    const sale = mapSale(created);
+    set(s => ({
+      ...s,
+      sales: [sale, ...s.sales],
+      products: s.products.map(p => {
+        const line = sale.lines.find(l => l.productId === p.id);
+        return line ? { ...p, stock: p.stock - line.quantity } : p;
+      }),
+    }));
+    postTuckshopSale({
+      date: sale.date, saleRef: sale.ref, paymentMethod: sale.paymentMethod,
+      amount: sale.subtotal, cogs: sale.cogs, studentName: sale.studentName,
+    });
+    return { ok: true, sale };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Sale could not be saved' };
   }
-  return result;
 }
 
-// ---------- Helpers ----------
-export function getTuckStockOnHand(productId: string) {
-  return getStockOnHand(productId, TUCKSHOP_WAREHOUSE_ID);
+async function changeStatus(saleId: string, status: 'Voided' | 'Refunded', reason: string) {
+  const sale = state.sales.find(s => s.id === saleId);
+  if (!sale) return { ok: false, error: 'Sale not found' };
+  if (sale.status !== 'Completed') return { ok: false, error: `Only completed sales can be ${status === 'Voided' ? 'voided' : 'refunded'}` };
+  try {
+    const updated = mapSale(await apiT.changeSaleStatus(Number(saleId), status, reason));
+    set(s => ({
+      ...s,
+      sales: s.sales.map(x => x.id === saleId ? updated : x),
+      products: s.products.map(p => {
+        const line = sale.lines.find(l => l.productId === p.id);
+        return line ? { ...p, stock: p.stock + line.quantity } : p;
+      }),
+    }));
+    postTuckshopRefund({
+      date: new Date().toISOString(), saleRef: sale.ref,
+      kind: status === 'Voided' ? 'Void' : 'Refund',
+      paymentMethod: sale.paymentMethod, amount: sale.subtotal, cogs: sale.cogs,
+    });
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Update failed' };
+  }
 }
 
-export const TUCKSHOP_WH = TUCKSHOP_WAREHOUSE_ID;
+export const voidSale = (saleId: string, reason: string) => changeStatus(saleId, 'Voided', reason);
+export const refundSale = (saleId: string, reason: string) => changeStatus(saleId, 'Refunded', reason);
+
+/* -------------------------------- Wastage ------------------------------- */
+
+export async function recordWastage(input: {
+  operator?: string;
+  lines: { productId: string; quantity: number; reason: string }[];
+}): Promise<{ ok: boolean; error?: string }> {
+  try {
+    for (const l of input.lines) {
+      const created = mapWastage(await apiT.createWastage({
+        product: Number(l.productId), quantity: l.quantity, reason: l.reason, operator: input.operator,
+      }));
+      set(s => ({
+        ...s,
+        wastage: [created, ...s.wastage],
+        products: s.products.map(p => p.id === l.productId ? { ...p, stock: p.stock - l.quantity } : p),
+      }));
+      postTuckshopWastage({
+        date: created.date, ref: created.ref, cost: created.cost, reason: created.reason,
+      });
+    }
+    return { ok: true };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Wastage could not be saved' };
+  }
+}
