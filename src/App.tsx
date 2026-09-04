@@ -43,6 +43,7 @@ import PortalOnlineClasses from "@/pages/portal/PortalOnlineClasses";
 import Subjects from "@/pages/academics/Subjects";
 import Classes from "@/pages/academics/Classes";
 import ContinuousAssessment from "@/pages/academics/ContinuousAssessment";
+import Examinations from "@/pages/academics/Examinations";
 import PlaceholderPage from "@/pages/PlaceholderPage";
 import SchoolSettings from "@/pages/admin/SchoolSettings";
 import BranchManagement from "@/pages/admin/BranchManagement";
