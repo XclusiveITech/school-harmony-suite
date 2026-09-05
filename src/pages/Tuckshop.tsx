@@ -92,9 +92,9 @@ export default function Tuckshop() {
       {tab === 'pos' && <POSTab operator={operator} products={products} tuckStock={tuckStock} prices={prices} />}
       {tab === 'shifts' && <ShiftsTab operator={operator} shifts={shifts} sales={sales} />}
       {tab === 'prices' && <PricesTab products={products} prices={prices} tuckStock={tuckStock} />}
-      {tab === 'wastage' && <WastageTab products={products} tuckStock={tuckStock} />}
+      {tab === 'wastage' && <WastageTab operator={operator} products={products} tuckStock={tuckStock} />}
       {tab === 'dashboard' && <DashboardTab sales={sales} productMap={productMap} tuckStock={tuckStock} products={products} />}
-      {tab === 'reports' && <ReportsTab sales={sales} shifts={shifts} movements={movements} productMap={productMap} />}
+      {tab === 'reports' && <ReportsTab sales={sales} shifts={shifts} wastage={wastage} productMap={productMap} />}
     </div>
   );
 }
