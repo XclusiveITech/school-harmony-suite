@@ -6,9 +6,8 @@ import {
   CreditCard, Wallet, UserCircle, Package, Receipt, Activity, RotateCcw,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useInventory, getStockOnHand, TUCKSHOP_WAREHOUSE_ID } from '@/lib/inventory-store';
 import {
-  useTuckshop, setPrice, getPrice, openShift, closeShift, getActiveShift,
+  useTuckshop, loadTuckshop, setPrice, getPrice, openShift, closeShift, getActiveShift,
   recordSale, voidSale, refundSale, recordWastage, type PaymentMethod,
 } from '@/lib/tuckshop-store';
 import { students } from '@/lib/dummy-data';
