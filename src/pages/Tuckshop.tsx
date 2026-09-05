@@ -36,16 +36,20 @@ export default function Tuckshop() {
   const { user } = useAuth();
   const operator = user?.name ?? 'Operator';
 
-  const products = useInventory(s => s.products);
-  const movements = useInventory(s => s.movements);
+  const products = useTuckshop(s => s.products);
+  const wastage = useTuckshop(s => s.wastage);
   const sales = useTuckshop(s => s.sales);
   const shifts = useTuckshop(s => s.shifts);
   const prices = useTuckshop(s => s.prices);
+  const loading = useTuckshop(s => s.loading);
+  const error = useTuckshop(s => s.error);
+
+  useEffect(() => { loadTuckshop(); }, []);
 
   const productMap = useMemo(() => Object.fromEntries(products.map(p => [p.id, p])), [products]);
   const tuckStock = useMemo(
-    () => Object.fromEntries(products.map(p => [p.id, getStockOnHand(p.id, TUCKSHOP_WAREHOUSE_ID)])),
-    [products, movements]
+    () => Object.fromEntries(products.map(p => [p.id, p.stock])),
+    [products]
   );
 
   return (
@@ -57,7 +61,17 @@ export default function Tuckshop() {
             POS · Shift management · {sales.filter(s => s.status === 'Completed').length} sales · ${sales.filter(s => s.status === 'Completed').reduce((a, s) => a + s.subtotal, 0).toFixed(2)} revenue
           </p>
         </div>
+        <button onClick={() => loadTuckshop()} disabled={loading}
+          className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-2 disabled:opacity-50">
+          <Activity size={14} /> {loading ? 'Loading…' : 'Refresh'}
+        </button>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive print:hidden">
+          {error}
+        </div>
+      )}
 
       <div className="flex gap-1 overflow-x-auto print:hidden border-b border-border">
         {TABS.map(t => (
