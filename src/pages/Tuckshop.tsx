@@ -418,9 +418,9 @@ function WastageTab({ operator, products, tuckStock }: any) {
           {['Expired', 'Damaged', 'Spoilage', 'Theft', 'Other'].map(r => <option key={r}>{r}</option>)}
         </select>
       </div>
-      <button onClick={() => {
+      <button onClick={async () => {
         if (!productId) return;
-        const r = recordWastage({ lines: [{ productId, quantity: qty, reason }] });
+        const r = await recordWastage({ operator, lines: [{ productId, quantity: qty, reason }] });
         if (!r.ok) toast({ title: 'Failed', description: r.error, variant: 'destructive' });
         else { toast({ title: 'Wastage recorded' }); setProductId(''); setQty(1); }
       }} className="w-full px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium">
