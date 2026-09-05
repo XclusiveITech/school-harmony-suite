@@ -313,15 +313,19 @@ function ShiftsTab({ operator, shifts, sales }: any) {
                   <input value={notes} onChange={e => setNotes(e.target.value)}
                     className="block w-full px-3 py-2 rounded-lg border border-input bg-background text-sm" />
                 </div>
-                <button onClick={() => {
-                  const r = closeShift(active.id, declaredCash, notes);
-                  if (r) {
-                    const v = r.variance ?? 0;
-                    toast({
-                      title: 'Shift closed',
-                      description: `Variance: ${v >= 0 ? '+' : ''}$${v.toFixed(2)} ${Math.abs(v) < 0.01 ? '(balanced)' : v > 0 ? '(over)' : '(short)'}`,
-                      variant: Math.abs(v) > 5 ? 'destructive' : 'default',
-                    });
+                <button onClick={async () => {
+                  try {
+                    const r = await closeShift(active.id, declaredCash, notes);
+                    if (r) {
+                      const v = r.variance ?? 0;
+                      toast({
+                        title: 'Shift closed',
+                        description: `Variance: ${v >= 0 ? '+' : ''}$${v.toFixed(2)} ${Math.abs(v) < 0.01 ? '(balanced)' : v > 0 ? '(over)' : '(short)'}`,
+                        variant: Math.abs(v) > 5 ? 'destructive' : 'default',
+                      });
+                    }
+                  } catch (e: any) {
+                    toast({ title: 'Could not close shift', description: e?.message, variant: 'destructive' });
                   }
                 }}
                   className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium flex items-center gap-2">
