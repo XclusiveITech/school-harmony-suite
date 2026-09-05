@@ -589,7 +589,7 @@ function ReportsTab({ sales, shifts, wastage, productMap }: any) {
             <option value="daily">Daily Sales Summary</option>
             <option value="cashup">Cashup / Shift Reconciliation</option>
             <option value="product">Product Sales</option>
-            <option value="movements">Stock Movements (Tuckshop)</option>
+            <option value="movements">Wastage Register (Tuckshop)</option>
             <option value="voids">Voids & Refunds</option>
             <option value="student">Student Purchases</option>
           </select>
@@ -652,10 +652,10 @@ function ReportsTab({ sales, shifts, wastage, productMap }: any) {
       })()}
 
       {report === 'movements' && (() => {
-        const head = ['Date', 'Type', 'Product', 'Qty', 'Unit Cost', 'Doc Ref'];
-        const body = filteredMov.map((m: any) => [m.date, m.type, productMap[m.productId]?.name || m.productId, m.quantity, `$${m.unitCost.toFixed(2)}`, m.documentRef]);
+        const head = ['Date', 'Ref', 'Product', 'Qty', 'Reason', 'Cost'];
+        const body = filteredWastage.map((w: any) => [String(w.date).slice(0, 10), w.ref, w.productName || productMap[w.productId]?.name || w.productId, w.quantity, w.reason, `$${w.cost.toFixed(2)}`]);
         return <ReportTable title={reportTitle.movements} head={head} body={body}
-          onCSV={() => doExportCSV('tuckshop-movements', head, body)} onPDF={() => doExportPDF('tuckshop-movements', head, body)} />;
+          onCSV={() => doExportCSV('tuckshop-wastage', head, body)} onPDF={() => doExportPDF('tuckshop-wastage', head, body)} />;
       })()}
 
       {report === 'voids' && (() => {
@@ -666,9 +666,9 @@ function ReportsTab({ sales, shifts, wastage, productMap }: any) {
             <div className="bg-card border border-border rounded-xl p-3 flex gap-2 items-end print:hidden">
               <input value={voidId} onChange={e => setVoidId(e.target.value)} placeholder="Sale Ref to void/refund (e.g. S-0001)"
                 className="px-3 py-2 rounded-lg border border-input bg-background text-sm flex-1" />
-              <button onClick={() => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = voidSale(s.id, 'Cancelled at counter'); toast({ title: r.ok ? 'Voided' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
+              <button onClick={async () => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = await voidSale(s.id, 'Cancelled at counter'); toast({ title: r.ok ? 'Voided' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
                 className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-1"><X size={14} /> Void</button>
-              <button onClick={() => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = refundSale(s.id, 'Customer refund'); toast({ title: r.ok ? 'Refunded' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
+              <button onClick={async () => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = await refundSale(s.id, 'Customer refund'); toast({ title: r.ok ? 'Refunded' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
                 className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-1"><RotateCcw size={14} /> Refund</button>
             </div>
             <ReportTable title={reportTitle.voids} head={head} body={body}
