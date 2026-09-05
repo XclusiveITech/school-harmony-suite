@@ -610,14 +610,6 @@ function ReportsTab({ sales, shifts, wastage, productMap }: any) {
             {studentOpts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
-        {report === 'movements' && (
-          <div className="col-span-2">
-            <label className="block text-xs text-muted-foreground mb-1">Warehouse</label>
-            <select value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm">
-              {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
-          </div>
-        )}
         <div className="col-span-2 md:col-span-1 flex justify-end">
           <button onClick={() => window.print()} className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-2"><Printer size={14} /> Print</button>
         </div>
