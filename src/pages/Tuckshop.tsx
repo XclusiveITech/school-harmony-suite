@@ -383,7 +383,7 @@ function PricesTab({ products, prices, tuckStock }: any) {
                 <td className="px-3 py-2 text-right">{tuckStock[p.id] ?? 0}</td>
                 <td className="px-3 py-2 text-right">
                   <input type="number" step="0.01" defaultValue={price}
-                    onBlur={e => setPrice(p.id, +e.target.value)}
+                    onBlur={e => { void setPrice(p.id, +e.target.value); }}
                     className="w-24 px-2 py-1 rounded border border-input bg-background text-right" />
                 </td>
               </tr>
