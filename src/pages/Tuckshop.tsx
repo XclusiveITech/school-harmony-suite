@@ -532,15 +532,13 @@ function DashboardTab({ sales, productMap, tuckStock, products }: any) {
 }
 
 // ---------------- Reports ----------------
-function ReportsTab({ sales, shifts, movements, productMap }: any) {
+function ReportsTab({ sales, shifts, wastage, productMap }: any) {
   const { toast } = useToast();
   const { settings } = useSchoolSettings();
-  const warehouses = useInventory(s => s.warehouses);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [operatorFilter, setOperatorFilter] = useState('All');
   const [studentFilter, setStudentFilter] = useState('All');
-  const [warehouseFilter, setWarehouseFilter] = useState<string>(TUCKSHOP_WAREHOUSE_ID);
   const [report, setReport] = useState<'daily' | 'cashup' | 'product' | 'movements' | 'voids' | 'student'>('daily');
   const [voidId, setVoidId] = useState('');
 
@@ -563,21 +561,17 @@ function ReportsTab({ sales, shifts, movements, productMap }: any) {
   const filteredSales = sales.filter(matchSale);
   const filteredShifts = shifts.filter((s: any) =>
     inRange(s.openedAt.slice(0, 10)) && (operatorFilter === 'All' || s.operator === operatorFilter));
-  const filteredMov = movements.filter((m: any) =>
-    ['SALE', 'SALE_RETURN', 'WASTAGE'].includes(m.type)
-    && m.warehouseId === warehouseFilter
-    && inRange(m.date));
+  const filteredWastage = wastage.filter((w: any) => inRange((w.date || '').slice(0, 10)));
 
   const reportTitle: Record<string, string> = {
     daily: 'Daily Sales Summary', cashup: 'Cashup / Shift Reconciliation',
-    product: 'Product Sales', movements: 'Stock Movements (Tuckshop)',
+    product: 'Product Sales', movements: 'Wastage Register (Tuckshop)',
     voids: 'Voids & Refunds', student: 'Student Purchases',
   };
 
   const filterMeta = {
     From: from || undefined, To: to || undefined,
     Operator: operatorFilter, Student: studentFilter === 'All' ? undefined : (studentOpts.find(s => s.id === studentFilter)?.name ?? studentFilter),
-    Warehouse: report === 'movements' ? (warehouses.find((w: any) => w.id === warehouseFilter)?.name ?? warehouseFilter) : undefined,
   };
 
   const subtitle = (from || to) ? `Period: ${from || '...'} to ${to || '...'}` : `As at ${new Date().toLocaleDateString()}`;
