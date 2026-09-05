@@ -396,7 +396,7 @@ function PricesTab({ products, prices, tuckStock }: any) {
 }
 
 // ---------------- Wastage ----------------
-function WastageTab({ products, tuckStock }: any) {
+function WastageTab({ operator, products, tuckStock }: any) {
   const { toast } = useToast();
   const [productId, setProductId] = useState('');
   const [qty, setQty] = useState(1);
