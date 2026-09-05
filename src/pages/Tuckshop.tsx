@@ -284,7 +284,10 @@ function ShiftsTab({ operator, shifts, sales }: any) {
               <input type="number" value={openingCash} onChange={e => setOpeningCash(+e.target.value)}
                 className="block px-3 py-2 rounded-lg border border-input bg-background text-sm w-40" />
             </div>
-            <button onClick={() => { openShift(operator, openingCash); toast({ title: 'Shift opened' }); }}
+            <button onClick={async () => {
+                try { await openShift(operator, openingCash); toast({ title: 'Shift opened' }); }
+                catch (e: any) { toast({ title: 'Could not open shift', description: e?.message, variant: 'destructive' }); }
+              }}
               className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2">
               <PlayCircle size={16} /> Open Shift
             </button>
