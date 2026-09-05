@@ -6,9 +6,8 @@ import {
   CreditCard, Wallet, UserCircle, Package, Receipt, Activity, RotateCcw,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useInventory, getStockOnHand, TUCKSHOP_WAREHOUSE_ID } from '@/lib/inventory-store';
 import {
-  useTuckshop, setPrice, getPrice, openShift, closeShift, getActiveShift,
+  useTuckshop, loadTuckshop, setPrice, getPrice, openShift, closeShift, getActiveShift,
   recordSale, voidSale, refundSale, recordWastage, type PaymentMethod,
 } from '@/lib/tuckshop-store';
 import { students } from '@/lib/dummy-data';
@@ -37,16 +36,20 @@ export default function Tuckshop() {
   const { user } = useAuth();
   const operator = user?.name ?? 'Operator';
 
-  const products = useInventory(s => s.products);
-  const movements = useInventory(s => s.movements);
+  const products = useTuckshop(s => s.products);
+  const wastage = useTuckshop(s => s.wastage);
   const sales = useTuckshop(s => s.sales);
   const shifts = useTuckshop(s => s.shifts);
   const prices = useTuckshop(s => s.prices);
+  const loading = useTuckshop(s => s.loading);
+  const error = useTuckshop(s => s.error);
+
+  useEffect(() => { loadTuckshop(); }, []);
 
   const productMap = useMemo(() => Object.fromEntries(products.map(p => [p.id, p])), [products]);
   const tuckStock = useMemo(
-    () => Object.fromEntries(products.map(p => [p.id, getStockOnHand(p.id, TUCKSHOP_WAREHOUSE_ID)])),
-    [products, movements]
+    () => Object.fromEntries(products.map(p => [p.id, p.stock])),
+    [products]
   );
 
   return (
@@ -58,7 +61,17 @@ export default function Tuckshop() {
             POS · Shift management · {sales.filter(s => s.status === 'Completed').length} sales · ${sales.filter(s => s.status === 'Completed').reduce((a, s) => a + s.subtotal, 0).toFixed(2)} revenue
           </p>
         </div>
+        <button onClick={() => loadTuckshop()} disabled={loading}
+          className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-2 disabled:opacity-50">
+          <Activity size={14} /> {loading ? 'Loading…' : 'Refresh'}
+        </button>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive print:hidden">
+          {error}
+        </div>
+      )}
 
       <div className="flex gap-1 overflow-x-auto print:hidden border-b border-border">
         {TABS.map(t => (
@@ -79,9 +92,9 @@ export default function Tuckshop() {
       {tab === 'pos' && <POSTab operator={operator} products={products} tuckStock={tuckStock} prices={prices} />}
       {tab === 'shifts' && <ShiftsTab operator={operator} shifts={shifts} sales={sales} />}
       {tab === 'prices' && <PricesTab products={products} prices={prices} tuckStock={tuckStock} />}
-      {tab === 'wastage' && <WastageTab products={products} tuckStock={tuckStock} />}
+      {tab === 'wastage' && <WastageTab operator={operator} products={products} tuckStock={tuckStock} />}
       {tab === 'dashboard' && <DashboardTab sales={sales} productMap={productMap} tuckStock={tuckStock} products={products} />}
-      {tab === 'reports' && <ReportsTab sales={sales} shifts={shifts} movements={movements} productMap={productMap} />}
+      {tab === 'reports' && <ReportsTab sales={sales} shifts={shifts} wastage={wastage} productMap={productMap} />}
     </div>
   );
 }
@@ -125,13 +138,13 @@ function POSTab({ operator, products, tuckStock, prices }: any) {
 
   const total = cart.reduce((s, x) => s + x.quantity * x.unitPrice, 0);
 
-  const checkout = () => {
+  const checkout = async () => {
     if (!activeShift) { toast({ title: 'Open a shift first', variant: 'destructive' }); return; }
     if (!cart.length) return;
     if ((paymentMethod === 'Student Card' || paymentMethod === 'Parent Account') && !student) {
       toast({ title: 'Select a student', variant: 'destructive' }); return;
     }
-    const r = recordSale({
+    const r = await recordSale({
       shiftId: activeShift.id, operator,
       paymentMethod,
       studentId: student?.id, studentName: student ? `${student.firstName} ${student.lastName}` : undefined,
@@ -271,7 +284,10 @@ function ShiftsTab({ operator, shifts, sales }: any) {
               <input type="number" value={openingCash} onChange={e => setOpeningCash(+e.target.value)}
                 className="block px-3 py-2 rounded-lg border border-input bg-background text-sm w-40" />
             </div>
-            <button onClick={() => { openShift(operator, openingCash); toast({ title: 'Shift opened' }); }}
+            <button onClick={async () => {
+                try { await openShift(operator, openingCash); toast({ title: 'Shift opened' }); }
+                catch (e: any) { toast({ title: 'Could not open shift', description: e?.message, variant: 'destructive' }); }
+              }}
               className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center gap-2">
               <PlayCircle size={16} /> Open Shift
             </button>
@@ -297,15 +313,19 @@ function ShiftsTab({ operator, shifts, sales }: any) {
                   <input value={notes} onChange={e => setNotes(e.target.value)}
                     className="block w-full px-3 py-2 rounded-lg border border-input bg-background text-sm" />
                 </div>
-                <button onClick={() => {
-                  const r = closeShift(active.id, declaredCash, notes);
-                  if (r) {
-                    const v = r.variance ?? 0;
-                    toast({
-                      title: 'Shift closed',
-                      description: `Variance: ${v >= 0 ? '+' : ''}$${v.toFixed(2)} ${Math.abs(v) < 0.01 ? '(balanced)' : v > 0 ? '(over)' : '(short)'}`,
-                      variant: Math.abs(v) > 5 ? 'destructive' : 'default',
-                    });
+                <button onClick={async () => {
+                  try {
+                    const r = await closeShift(active.id, declaredCash, notes);
+                    if (r) {
+                      const v = r.variance ?? 0;
+                      toast({
+                        title: 'Shift closed',
+                        description: `Variance: ${v >= 0 ? '+' : ''}$${v.toFixed(2)} ${Math.abs(v) < 0.01 ? '(balanced)' : v > 0 ? '(over)' : '(short)'}`,
+                        variant: Math.abs(v) > 5 ? 'destructive' : 'default',
+                      });
+                    }
+                  } catch (e: any) {
+                    toast({ title: 'Could not close shift', description: e?.message, variant: 'destructive' });
                   }
                 }}
                   className="px-4 py-2 rounded-lg bg-destructive text-destructive-foreground text-sm font-medium flex items-center gap-2">
@@ -363,7 +383,7 @@ function PricesTab({ products, prices, tuckStock }: any) {
                 <td className="px-3 py-2 text-right">{tuckStock[p.id] ?? 0}</td>
                 <td className="px-3 py-2 text-right">
                   <input type="number" step="0.01" defaultValue={price}
-                    onBlur={e => setPrice(p.id, +e.target.value)}
+                    onBlur={e => { void setPrice(p.id, +e.target.value); }}
                     className="w-24 px-2 py-1 rounded border border-input bg-background text-right" />
                 </td>
               </tr>
@@ -376,7 +396,7 @@ function PricesTab({ products, prices, tuckStock }: any) {
 }
 
 // ---------------- Wastage ----------------
-function WastageTab({ products, tuckStock }: any) {
+function WastageTab({ operator, products, tuckStock }: any) {
   const { toast } = useToast();
   const [productId, setProductId] = useState('');
   const [qty, setQty] = useState(1);
@@ -398,9 +418,9 @@ function WastageTab({ products, tuckStock }: any) {
           {['Expired', 'Damaged', 'Spoilage', 'Theft', 'Other'].map(r => <option key={r}>{r}</option>)}
         </select>
       </div>
-      <button onClick={() => {
+      <button onClick={async () => {
         if (!productId) return;
-        const r = recordWastage({ lines: [{ productId, quantity: qty, reason }] });
+        const r = await recordWastage({ operator, lines: [{ productId, quantity: qty, reason }] });
         if (!r.ok) toast({ title: 'Failed', description: r.error, variant: 'destructive' });
         else { toast({ title: 'Wastage recorded' }); setProductId(''); setQty(1); }
       }} className="w-full px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium">
@@ -512,15 +532,13 @@ function DashboardTab({ sales, productMap, tuckStock, products }: any) {
 }
 
 // ---------------- Reports ----------------
-function ReportsTab({ sales, shifts, movements, productMap }: any) {
+function ReportsTab({ sales, shifts, wastage, productMap }: any) {
   const { toast } = useToast();
   const { settings } = useSchoolSettings();
-  const warehouses = useInventory(s => s.warehouses);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [operatorFilter, setOperatorFilter] = useState('All');
   const [studentFilter, setStudentFilter] = useState('All');
-  const [warehouseFilter, setWarehouseFilter] = useState<string>(TUCKSHOP_WAREHOUSE_ID);
   const [report, setReport] = useState<'daily' | 'cashup' | 'product' | 'movements' | 'voids' | 'student'>('daily');
   const [voidId, setVoidId] = useState('');
 
@@ -543,21 +561,17 @@ function ReportsTab({ sales, shifts, movements, productMap }: any) {
   const filteredSales = sales.filter(matchSale);
   const filteredShifts = shifts.filter((s: any) =>
     inRange(s.openedAt.slice(0, 10)) && (operatorFilter === 'All' || s.operator === operatorFilter));
-  const filteredMov = movements.filter((m: any) =>
-    ['SALE', 'SALE_RETURN', 'WASTAGE'].includes(m.type)
-    && m.warehouseId === warehouseFilter
-    && inRange(m.date));
+  const filteredWastage = wastage.filter((w: any) => inRange((w.date || '').slice(0, 10)));
 
   const reportTitle: Record<string, string> = {
     daily: 'Daily Sales Summary', cashup: 'Cashup / Shift Reconciliation',
-    product: 'Product Sales', movements: 'Stock Movements (Tuckshop)',
+    product: 'Product Sales', movements: 'Wastage Register (Tuckshop)',
     voids: 'Voids & Refunds', student: 'Student Purchases',
   };
 
   const filterMeta = {
     From: from || undefined, To: to || undefined,
     Operator: operatorFilter, Student: studentFilter === 'All' ? undefined : (studentOpts.find(s => s.id === studentFilter)?.name ?? studentFilter),
-    Warehouse: report === 'movements' ? (warehouses.find((w: any) => w.id === warehouseFilter)?.name ?? warehouseFilter) : undefined,
   };
 
   const subtitle = (from || to) ? `Period: ${from || '...'} to ${to || '...'}` : `As at ${new Date().toLocaleDateString()}`;
@@ -575,7 +589,7 @@ function ReportsTab({ sales, shifts, movements, productMap }: any) {
             <option value="daily">Daily Sales Summary</option>
             <option value="cashup">Cashup / Shift Reconciliation</option>
             <option value="product">Product Sales</option>
-            <option value="movements">Stock Movements (Tuckshop)</option>
+            <option value="movements">Wastage Register (Tuckshop)</option>
             <option value="voids">Voids & Refunds</option>
             <option value="student">Student Purchases</option>
           </select>
@@ -596,14 +610,6 @@ function ReportsTab({ sales, shifts, movements, productMap }: any) {
             {studentOpts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
-        {report === 'movements' && (
-          <div className="col-span-2">
-            <label className="block text-xs text-muted-foreground mb-1">Warehouse</label>
-            <select value={warehouseFilter} onChange={e => setWarehouseFilter(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm">
-              {warehouses.map((w: any) => <option key={w.id} value={w.id}>{w.name}</option>)}
-            </select>
-          </div>
-        )}
         <div className="col-span-2 md:col-span-1 flex justify-end">
           <button onClick={() => window.print()} className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-2"><Printer size={14} /> Print</button>
         </div>
@@ -646,10 +652,10 @@ function ReportsTab({ sales, shifts, movements, productMap }: any) {
       })()}
 
       {report === 'movements' && (() => {
-        const head = ['Date', 'Type', 'Product', 'Qty', 'Unit Cost', 'Doc Ref'];
-        const body = filteredMov.map((m: any) => [m.date, m.type, productMap[m.productId]?.name || m.productId, m.quantity, `$${m.unitCost.toFixed(2)}`, m.documentRef]);
+        const head = ['Date', 'Ref', 'Product', 'Qty', 'Reason', 'Cost'];
+        const body = filteredWastage.map((w: any) => [String(w.date).slice(0, 10), w.ref, w.productName || productMap[w.productId]?.name || w.productId, w.quantity, w.reason, `$${w.cost.toFixed(2)}`]);
         return <ReportTable title={reportTitle.movements} head={head} body={body}
-          onCSV={() => doExportCSV('tuckshop-movements', head, body)} onPDF={() => doExportPDF('tuckshop-movements', head, body)} />;
+          onCSV={() => doExportCSV('tuckshop-wastage', head, body)} onPDF={() => doExportPDF('tuckshop-wastage', head, body)} />;
       })()}
 
       {report === 'voids' && (() => {
@@ -660,9 +666,9 @@ function ReportsTab({ sales, shifts, movements, productMap }: any) {
             <div className="bg-card border border-border rounded-xl p-3 flex gap-2 items-end print:hidden">
               <input value={voidId} onChange={e => setVoidId(e.target.value)} placeholder="Sale Ref to void/refund (e.g. S-0001)"
                 className="px-3 py-2 rounded-lg border border-input bg-background text-sm flex-1" />
-              <button onClick={() => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = voidSale(s.id, 'Cancelled at counter'); toast({ title: r.ok ? 'Voided' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
+              <button onClick={async () => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = await voidSale(s.id, 'Cancelled at counter'); toast({ title: r.ok ? 'Voided' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
                 className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-1"><X size={14} /> Void</button>
-              <button onClick={() => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = refundSale(s.id, 'Customer refund'); toast({ title: r.ok ? 'Refunded' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
+              <button onClick={async () => { const s = sales.find((x: any) => x.ref === voidId); if (!s) return toast({ title: 'Sale not found', variant: 'destructive' }); const r = await refundSale(s.id, 'Customer refund'); toast({ title: r.ok ? 'Refunded' : 'Failed', description: r.error, variant: r.ok ? 'default' : 'destructive' }); }}
                 className="px-3 py-2 rounded-lg border border-border text-sm flex items-center gap-1"><RotateCcw size={14} /> Refund</button>
             </div>
             <ReportTable title={reportTitle.voids} head={head} body={body}
