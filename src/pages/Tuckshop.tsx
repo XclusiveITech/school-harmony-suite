@@ -138,13 +138,13 @@ function POSTab({ operator, products, tuckStock, prices }: any) {
 
   const total = cart.reduce((s, x) => s + x.quantity * x.unitPrice, 0);
 
-  const checkout = () => {
+  const checkout = async () => {
     if (!activeShift) { toast({ title: 'Open a shift first', variant: 'destructive' }); return; }
     if (!cart.length) return;
     if ((paymentMethod === 'Student Card' || paymentMethod === 'Parent Account') && !student) {
       toast({ title: 'Select a student', variant: 'destructive' }); return;
     }
-    const r = recordSale({
+    const r = await recordSale({
       shiftId: activeShift.id, operator,
       paymentMethod,
       studentId: student?.id, studentName: student ? `${student.firstName} ${student.lastName}` : undefined,
