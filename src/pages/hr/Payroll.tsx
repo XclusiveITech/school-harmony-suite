@@ -75,8 +75,11 @@ export default function Payroll() {
   }), { gross: 0, tax: 0, pension: 0, leave: 0, net: 0 }), [payslips]);
 
   const activeRun = runs.find(r => r.id === runId);
-  const nameFor = (p: BackendPayslip) =>
-    p.staff_name || staff.find(s => s.id === p.staff)?.first_name && staffName(staff.find(s => s.id === p.staff)!) || '-';
+  const nameFor = (p: BackendPayslip) => {
+    if (p.staff_name) return p.staff_name;
+    const s = staff.find(x => x.id === p.staff);
+    return s ? staffName(s) : '-';
+  };
 
   const btnOutline = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-input text-foreground font-medium text-sm hover:bg-muted transition-colors";
 
