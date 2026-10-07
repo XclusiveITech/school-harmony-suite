@@ -185,6 +185,13 @@ export default function Assets() {
         </div>
       </div>
 
+      {(loading || loadError) && (
+        <div className={`rounded-lg px-4 py-3 text-sm flex items-center justify-between ${loadError ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'}`}>
+          <span>{loadError || 'Loading assets…'}</span>
+          {loadError && <button onClick={load} className="underline font-medium">Retry</button>}
+        </div>
+      )}
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-card rounded-xl p-5 shadow-card light-card-blue">
