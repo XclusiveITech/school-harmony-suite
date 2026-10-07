@@ -1,56 +1,58 @@
-import React, { useState } from 'react';
-import { useBranch } from '@/contexts/BranchContext';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { glAccounts } from '@/lib/dummy-data';
-import { Printer, TrendingUp, TrendingDown, Building2, BarChart3 } from 'lucide-react';
+import { Printer, TrendingUp, TrendingDown, Building2, BarChart3, RefreshCw } from 'lucide-react';
 import ReportHeader from '@/components/ReportHeader';
 import ReportFilters from '@/components/ReportFilters';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { getCumulativeIncome, CumulativeIncomeReport, BranchIncomeStatement } from '@/lib/reports-api';
 
-// Simulated per-branch financial data
-function getBranchFinancials(branchId: string, branchName: string) {
-  const multipliers: Record<string, number> = { '1': 1, '2': 0.75, '3': 0.55 };
-  const m = multipliers[branchId] || 0.5 + Math.random() * 0.5;
-
-  const revenue = glAccounts.filter(a => a.type === 'Revenue').map(a => ({
-    ...a, balance: Math.round(a.balance * m),
-  }));
-  const expenses = glAccounts.filter(a => a.type === 'Expense').map(a => ({
-    ...a, balance: Math.round(a.balance * m),
-  }));
-
-  const totalRevenue = revenue.reduce((s, a) => s + a.balance, 0);
-  const totalExpenses = expenses.reduce((s, a) => s + a.balance, 0);
-
-  return {
-    branchId, branchName, revenue, expenses,
-    totalRevenue, totalExpenses,
-    netIncome: totalRevenue - totalExpenses,
-    margin: totalRevenue > 0 ? ((totalRevenue - totalExpenses) / totalRevenue * 100) : 0,
-  };
-}
+const emptyReport: CumulativeIncomeReport = { branches: [], consolidated: { revenue: [], expenses: [], net: 0 } };
 
 export default function CumulativeIncomeStatement() {
   const { user } = useAuth();
-  const { branches } = useBranch();
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [report, setReport] = useState<CumulativeIncomeReport>(emptyReport);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getCumulativeIncome({ dateFrom, dateTo });
+      setReport(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load cumulative income statement');
+    } finally {
+      setLoading(false);
+    }
+  }, [dateFrom, dateTo]);
+
+  useEffect(() => {
+    if (user?.role === 'superadmin') load();
+  }, [load, user?.role]);
 
   if (user?.role !== 'superadmin') {
     return <div className="p-8 text-center text-muted-foreground">Access denied. Only Super Administrators can view cumulative reports.</div>;
   }
 
-  const activeBranches = branches.filter(b => b.status === 'Active');
-  const branchData = activeBranches.map(b => getBranchFinancials(b.id, b.name));
+  const branchData: (BranchIncomeStatement & { totalRevenue: number; totalExpenses: number; netIncome: number; margin: number })[] =
+    report.branches.map(b => {
+      const totalRevenue = b.revenue.reduce((s, a) => s + a.amount, 0);
+      const totalExpenses = b.expenses.reduce((s, a) => s + a.amount, 0);
+      const netIncome = b.net || (totalRevenue - totalExpenses);
+      return { ...b, totalRevenue, totalExpenses, netIncome, margin: totalRevenue > 0 ? (netIncome / totalRevenue * 100) : 0 };
+    });
 
-  const grandTotalRevenue = branchData.reduce((s, b) => s + b.totalRevenue, 0);
-  const grandTotalExpenses = branchData.reduce((s, b) => s + b.totalExpenses, 0);
-  const grandNetIncome = grandTotalRevenue - grandTotalExpenses;
+  const grandTotalRevenue = report.consolidated.revenue.reduce((s, a) => s + a.amount, 0) || branchData.reduce((s, b) => s + b.totalRevenue, 0);
+  const grandTotalExpenses = report.consolidated.expenses.reduce((s, a) => s + a.amount, 0) || branchData.reduce((s, b) => s + b.totalExpenses, 0);
+  const grandNetIncome = report.consolidated.net || (grandTotalRevenue - grandTotalExpenses);
   const grandMargin = grandTotalRevenue > 0 ? (grandNetIncome / grandTotalRevenue * 100) : 0;
 
-  const bestBranch = branchData.reduce((best, b) => b.netIncome > best.netIncome ? b : best, branchData[0]);
-  const worstBranch = branchData.reduce((worst, b) => b.netIncome < worst.netIncome ? b : worst, branchData[0]);
+  const bestBranch = branchData.length ? branchData.reduce((best, b) => b.netIncome > best.netIncome ? b : best, branchData[0]) : undefined;
+  const worstBranch = branchData.length ? branchData.reduce((worst, b) => b.netIncome < worst.netIncome ? b : worst, branchData[0]) : undefined;
 
   const subtitle = dateFrom || dateTo
     ? `For the period ${dateFrom || '...'} to ${dateTo || '...'}`
@@ -74,6 +76,19 @@ export default function CumulativeIncomeStatement() {
         </CardContent>
       </Card>
 
+      {error && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 flex items-center justify-between print:hidden">
+          <p className="text-sm text-destructive">{error}</p>
+          <button onClick={load} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-destructive/40 text-destructive text-sm hover:bg-destructive/10">
+            <RefreshCw size={14} /> Retry
+          </button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="py-12 text-center text-muted-foreground">Loading cumulative income statement…</div>
+      ) : (
+      <>
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 print:grid-cols-4">
         <Card>
@@ -114,7 +129,7 @@ export default function CumulativeIncomeStatement() {
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center"><Building2 className="text-primary" size={20} /></div>
               <div>
-                <p className="text-xl font-bold text-foreground">{activeBranches.length}</p>
+                <p className="text-xl font-bold text-foreground">{branchData.length}</p>
                 <p className="text-xs text-muted-foreground">Active Branches</p>
               </div>
             </div>
@@ -147,8 +162,8 @@ export default function CumulativeIncomeStatement() {
                   </thead>
                   <tbody>
                     {branchData.map(b => (
-                      <tr key={b.branchId} className="border-b border-border/50 hover:bg-muted/50">
-                        <td className="py-3 px-3 font-medium text-foreground">{b.branchName}</td>
+                      <tr key={b.branch} className="border-b border-border/50 hover:bg-muted/50">
+                        <td className="py-3 px-3 font-medium text-foreground">{b.branch_name}</td>
                         <td className="py-3 px-3 text-right text-foreground">${b.totalRevenue.toLocaleString()}</td>
                         <td className="py-3 px-3 text-right text-foreground">${b.totalExpenses.toLocaleString()}</td>
                         <td className={`py-3 px-3 text-right font-semibold ${b.netIncome >= 0 ? 'text-success' : 'text-destructive'}`}>
@@ -160,6 +175,9 @@ export default function CumulativeIncomeStatement() {
                         </td>
                       </tr>
                     ))}
+                    {branchData.length === 0 && (
+                      <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">No branch data for the selected period.</td></tr>
+                    )}
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 border-primary font-bold">
@@ -182,10 +200,10 @@ export default function CumulativeIncomeStatement() {
         {/* Tab 2: Detailed per-branch */}
         <TabsContent value="detailed" className="space-y-6">
           {branchData.map(b => (
-            <Card key={b.branchId}>
+            <Card key={b.branch}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <Building2 size={18} className="text-primary" /> {b.branchName}
+                  <Building2 size={18} className="text-primary" /> {b.branch_name}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -193,7 +211,7 @@ export default function CumulativeIncomeStatement() {
                 {b.revenue.map(acc => (
                   <div key={acc.code} className="flex justify-between py-1.5 px-2 text-sm hover:bg-muted/50 rounded">
                     <span className="text-foreground">{acc.name}</span>
-                    <span className="font-medium text-foreground">${acc.balance.toLocaleString()}</span>
+                    <span className="font-medium text-foreground">${acc.amount.toLocaleString()}</span>
                   </div>
                 ))}
                 <div className="flex justify-between py-2 px-2 mt-1 border-t border-border font-semibold text-sm">
@@ -205,7 +223,7 @@ export default function CumulativeIncomeStatement() {
                 {b.expenses.map(acc => (
                   <div key={acc.code} className="flex justify-between py-1.5 px-2 text-sm hover:bg-muted/50 rounded">
                     <span className="text-foreground">{acc.name}</span>
-                    <span className="font-medium text-foreground">${acc.balance.toLocaleString()}</span>
+                    <span className="font-medium text-foreground">${acc.amount.toLocaleString()}</span>
                   </div>
                 ))}
                 <div className="flex justify-between py-2 px-2 mt-1 border-t border-border font-semibold text-sm">
@@ -231,21 +249,21 @@ export default function CumulativeIncomeStatement() {
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-12 h-12 rounded-lg bg-success/10 flex items-center justify-center"><TrendingUp className="text-success" size={24} /></div>
                   <div>
-                    <p className="font-semibold text-foreground text-lg">{bestBranch?.branchName}</p>
+                    <p className="font-semibold text-foreground text-lg">{bestBranch?.branch_name ?? '—'}</p>
                     <p className="text-sm text-muted-foreground">Highest net income</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="p-2 rounded-lg bg-muted">
-                    <p className="text-sm font-bold text-foreground">${bestBranch?.totalRevenue.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-foreground">${bestBranch?.totalRevenue.toLocaleString() ?? 0}</p>
                     <p className="text-[10px] text-muted-foreground">Revenue</p>
                   </div>
                   <div className="p-2 rounded-lg bg-muted">
-                    <p className="text-sm font-bold text-foreground">${bestBranch?.totalExpenses.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-foreground">${bestBranch?.totalExpenses.toLocaleString() ?? 0}</p>
                     <p className="text-[10px] text-muted-foreground">Expenses</p>
                   </div>
                   <div className="p-2 rounded-lg bg-muted">
-                    <p className="text-sm font-bold text-success">${bestBranch?.netIncome.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-success">${bestBranch?.netIncome.toLocaleString() ?? 0}</p>
                     <p className="text-[10px] text-muted-foreground">Net Income</p>
                   </div>
                 </div>
@@ -258,21 +276,21 @@ export default function CumulativeIncomeStatement() {
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-12 h-12 rounded-lg bg-warning/10 flex items-center justify-center"><TrendingDown className="text-warning" size={24} /></div>
                   <div>
-                    <p className="font-semibold text-foreground text-lg">{worstBranch?.branchName}</p>
+                    <p className="font-semibold text-foreground text-lg">{worstBranch?.branch_name ?? '—'}</p>
                     <p className="text-sm text-muted-foreground">Lowest net income</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="p-2 rounded-lg bg-muted">
-                    <p className="text-sm font-bold text-foreground">${worstBranch?.totalRevenue.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-foreground">${worstBranch?.totalRevenue.toLocaleString() ?? 0}</p>
                     <p className="text-[10px] text-muted-foreground">Revenue</p>
                   </div>
                   <div className="p-2 rounded-lg bg-muted">
-                    <p className="text-sm font-bold text-foreground">${worstBranch?.totalExpenses.toLocaleString()}</p>
+                    <p className="text-sm font-bold text-foreground">${worstBranch?.totalExpenses.toLocaleString() ?? 0}</p>
                     <p className="text-[10px] text-muted-foreground">Expenses</p>
                   </div>
                   <div className="p-2 rounded-lg bg-muted">
-                    <p className={`text-sm font-bold ${(worstBranch?.netIncome ?? 0) >= 0 ? 'text-success' : 'text-destructive'}`}>${worstBranch?.netIncome.toLocaleString()}</p>
+                    <p className={`text-sm font-bold ${(worstBranch?.netIncome ?? 0) >= 0 ? 'text-success' : 'text-destructive'}`}>${worstBranch?.netIncome.toLocaleString() ?? 0}</p>
                     <p className="text-[10px] text-muted-foreground">Net Income</p>
                   </div>
                 </div>
@@ -287,9 +305,9 @@ export default function CumulativeIncomeStatement() {
                   {branchData.map(b => {
                     const pct = grandTotalRevenue > 0 ? (b.totalRevenue / grandTotalRevenue * 100) : 0;
                     return (
-                      <div key={b.branchId}>
+                      <div key={b.branch}>
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="font-medium text-foreground">{b.branchName}</span>
+                          <span className="font-medium text-foreground">{b.branch_name}</span>
                           <span className="text-muted-foreground">${b.totalRevenue.toLocaleString()} ({pct.toFixed(1)}%)</span>
                         </div>
                         <div className="w-full h-3 rounded-full bg-muted overflow-hidden">
@@ -309,8 +327,8 @@ export default function CumulativeIncomeStatement() {
       <div className="hidden print:block bg-card rounded-xl p-6 max-w-3xl">
         <ReportHeader reportTitle="Cumulative Income Statement — All Branches" subtitle={subtitle} />
         {branchData.map(b => (
-          <div key={b.branchId} className="mb-6">
-            <h3 className="font-display font-semibold text-card-foreground mb-2 text-base border-b border-border pb-1">{b.branchName}</h3>
+          <div key={b.branch} className="mb-6">
+            <h3 className="font-display font-semibold text-card-foreground mb-2 text-base border-b border-border pb-1">{b.branch_name}</h3>
             <div className="flex justify-between py-1 text-sm"><span>Total Revenue</span><span className="font-medium">${b.totalRevenue.toLocaleString()}</span></div>
             <div className="flex justify-between py-1 text-sm"><span>Total Expenses</span><span className="font-medium">${b.totalExpenses.toLocaleString()}</span></div>
             <div className="flex justify-between py-1 text-sm font-bold border-t border-border mt-1 pt-1">
@@ -326,11 +344,12 @@ export default function CumulativeIncomeStatement() {
             <span>Grand Total Expenses</span><span>${grandTotalExpenses.toLocaleString()}</span>
           </div>
           <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t-2 border-primary">
-            <span>Grand Net Income</span>
-            <span className={grandNetIncome >= 0 ? 'text-success' : 'text-destructive'}>${grandNetIncome.toLocaleString()}</span>
+            <span>Grand Net Income</span><span className={grandNetIncome >= 0 ? 'text-success' : 'text-destructive'}>${grandNetIncome.toLocaleString()}</span>
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

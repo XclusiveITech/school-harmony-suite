@@ -1,36 +1,57 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
-  FeeStructure, FeeItem, StudentAssignment, GeneratedInvoice, AcademicTerm, AuditEntry,
-  BillingCycle, StructureStatus,
-  academicTerms as seedTerms, initialStructures, initialAssignments,
-  structureTotal, structureFullTotal, generateInvoiceForAssignment, agingBuckets,
+  AcademicTerm, StudentAssignment, GeneratedInvoice, AuditEntry,
+  academicTerms as seedTerms, initialAssignments, agingBuckets,
 } from '@/lib/fees-structure-store';
-import { students, glAccounts, classes } from '@/lib/dummy-data';
+import {
+  listFeeStructures, createFeeStructure, updateFeeStructure, activateFeeStructure,
+  newVersionFeeStructure, billStudentsForFeeStructure,
+  type BackendFeeStructure, type BackendFeeItem, type FeeStructureStatus,
+} from '@/lib/fees-api';
+import { listGLAccounts, type BackendGLAccount, num } from '@/lib/finance-api';
+import { listStudents, type BackendStudent } from '@/lib/students-api';
 import ReportHeader from '@/components/ReportHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Plus, Printer, Check, X, Eye, Layers, Calendar, Users, Receipt,
-  PlayCircle, History, FileSpreadsheet, AlertTriangle, DollarSign, Trash2, Copy,
+  PlayCircle, History, FileSpreadsheet, AlertTriangle, Trash2, Copy, RefreshCw,
 } from 'lucide-react';
 
 type Tab = 'structures' | 'calendar' | 'assignments' | 'billing' | 'invoices' | 'aging' | 'audit';
 
-const revenueAccounts = glAccounts.filter(a => a.type === 'Revenue');
-const levels = Array.from(new Set(classes.map(c => c.level)));
-
 export default function FeesStructure() {
   const [tab, setTab] = useState<Tab>('structures');
-  const [structures, setStructures] = useState<FeeStructure[]>(initialStructures);
+  const [structures, setStructures] = useState<BackendFeeStructure[]>([]);
+  const [glAccounts, setGlAccounts] = useState<BackendGLAccount[]>([]);
+  const [students, setStudents] = useState<BackendStudent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [terms, setTerms] = useState<AcademicTerm[]>(seedTerms);
   const [assignments, setAssignments] = useState<StudentAssignment[]>(initialAssignments);
   const [invoices, setInvoices] = useState<GeneratedInvoice[]>([]);
-  const [audit, setAudit] = useState<AuditEntry[]>([
-    { id: 'a1', timestamp: '2025-11-15 09:12', actor: 'Principal', action: 'Approved', entity: 'FeeStructure', entityId: 'fs1', details: 'Form 1 Day Scholar - 2026 v1 approved' },
-    { id: 'a2', timestamp: '2025-11-15 09:13', actor: 'Principal', action: 'Approved', entity: 'FeeStructure', entityId: 'fs2', details: 'Form 3 Boarding - 2026 v1 approved' },
-  ]);
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
 
   const log = (action: string, entity: string, entityId: string, details: string) =>
     setAudit(p => [{ id: String(Date.now()), timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16), actor: 'Current User', action, entity, entityId, details }, ...p]);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [fs, gl, studs] = await Promise.all([listFeeStructures(), listGLAccounts(), listStudents()]);
+      setStructures(fs);
+      setGlAccounts(gl);
+      setStudents(studs);
+    } catch (e: any) {
+      setError(e?.message || 'Could not load fee structures from the server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     { id: 'structures', label: 'Fee Structures', icon: <Layers size={16} /> },
@@ -50,11 +71,21 @@ export default function FeesStructure() {
           <p className="text-sm text-muted-foreground">Versioned fee structures, academic calendar driven invoicing, AR & GL integration</p>
         </div>
         <div className="flex gap-2">
+          <button onClick={load} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm hover:bg-muted">
+            <RefreshCw size={16} /> Refresh
+          </button>
           <button onClick={() => window.print()} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm hover:bg-muted">
             <Printer size={16} /> Print
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 text-destructive px-4 py-3 text-sm flex items-center justify-between no-print">
+          <span>{error}</span>
+          <button onClick={load} className="underline font-medium">Retry</button>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-1 border-b border-border no-print">
         {tabs.map(t => (
@@ -68,49 +99,126 @@ export default function FeesStructure() {
         ))}
       </div>
 
-      {tab === 'structures' && <StructuresTab structures={structures} setStructures={setStructures} log={log} />}
-      {tab === 'calendar' && <CalendarTab terms={terms} setTerms={setTerms} log={log} />}
-      {tab === 'assignments' && <AssignmentsTab assignments={assignments} setAssignments={setAssignments} structures={structures} log={log} />}
-      {tab === 'billing' && <BillingTab structures={structures} terms={terms} assignments={assignments} invoices={invoices} setInvoices={setInvoices} log={log} />}
-      {tab === 'invoices' && <InvoicesTab invoices={invoices} setInvoices={setInvoices} structures={structures} log={log} />}
-      {tab === 'aging' && <AgingTab invoices={invoices} />}
-      {tab === 'audit' && <AuditTab audit={audit} />}
+      {loading ? (
+        <div className="py-16 text-center text-sm text-muted-foreground">Loading fee structures…</div>
+      ) : (
+        <>
+          {tab === 'structures' && <StructuresTab structures={structures} glAccounts={glAccounts} reload={load} log={log} />}
+          {tab === 'calendar' && <CalendarTab terms={terms} setTerms={setTerms} log={log} />}
+          {tab === 'assignments' && <AssignmentsTab assignments={assignments} setAssignments={setAssignments} structures={structures} students={students} log={log} />}
+          {tab === 'billing' && <BillingTab structures={structures} terms={terms} students={students} reload={load} log={log} />}
+          {tab === 'invoices' && <InvoicesTab invoices={invoices} setInvoices={setInvoices} structures={structures} students={students} log={log} />}
+          {tab === 'aging' && <AgingTab invoices={invoices} students={students} />}
+          {tab === 'audit' && <AuditTab audit={audit} />}
+        </>
+      )}
     </div>
   );
 }
 
-// ============== STRUCTURES TAB ==============
-function StructuresTab({ structures, setStructures, log }: { structures: FeeStructure[]; setStructures: React.Dispatch<React.SetStateAction<FeeStructure[]>>; log: (a: string, e: string, id: string, d: string) => void }) {
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<FeeStructure | null>(null);
-  const [viewing, setViewing] = useState<FeeStructure | null>(null);
+const statusBadge = (status: FeeStructureStatus) =>
+  status === 'Active' ? 'bg-success/10 text-success' :
+  status === 'Draft' ? 'bg-muted text-muted-foreground' :
+  'bg-destructive/10 text-destructive';
 
-  const updateStatus = (id: string, status: StructureStatus) => {
-    setStructures(p => p.map(s => s.id === id ? { ...s, status, approvedBy: status === 'Approved' ? 'Current User' : s.approvedBy, approvedAt: status === 'Approved' ? new Date().toISOString().split('T')[0] : s.approvedAt } : s));
-    log(status, 'FeeStructure', id, `Structure ${id} marked ${status}`);
+function structureTotal(s: BackendFeeStructure): number {
+  return s.items.filter(i => i.mandatory).reduce((sum, i) => sum + num(i.amount), 0);
+}
+function structureFullTotal(s: BackendFeeStructure): number {
+  return s.items.reduce((sum, i) => sum + num(i.amount), 0);
+}
+
+// ============== STRUCTURES TAB ==============
+interface StructFormState {
+  id?: number;
+  name: string; level: string; class_name: string; term: string; year: string;
+  currency: string; effective_from: string;
+  items: { name: string; amount: number; gl_account: number; mandatory: boolean }[];
+}
+
+function emptyForm(glAccounts: BackendGLAccount[]): StructFormState {
+  return {
+    name: '', level: '', class_name: '', term: '', year: String(new Date().getFullYear()),
+    currency: 'USD', effective_from: new Date().toISOString().split('T')[0],
+    items: [],
+  };
+}
+
+function StructuresTab({ structures, glAccounts, reload, log }: {
+  structures: BackendFeeStructure[]; glAccounts: BackendGLAccount[];
+  reload: () => Promise<void>; log: (a: string, e: string, id: string, d: string) => void;
+}) {
+  const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<BackendFeeStructure | null>(null);
+  const [viewing, setViewing] = useState<BackendFeeStructure | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const revenueAccounts = useMemo(
+    () => glAccounts.filter(a => (a.type || '').toLowerCase() === 'revenue'),
+    [glAccounts],
+  );
+  const accountOptions = revenueAccounts.length ? revenueAccounts : glAccounts;
+
+  const handleActivate = async (s: BackendFeeStructure) => {
+    setBusyId(s.id);
+    try {
+      await activateFeeStructure(s.id);
+      toast.success(`${s.name} activated (previous active version archived)`);
+      log('Activated', 'FeeStructure', String(s.id), `${s.name} v${s.version} activated`);
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not activate fee structure.');
+    } finally {
+      setBusyId(null);
+    }
   };
 
-  const newVersion = (s: FeeStructure) => {
-    const newer: FeeStructure = {
-      ...s,
-      id: `fs-${Date.now()}`,
-      version: s.version + 1,
-      parentId: s.id,
-      status: 'Draft',
-      createdAt: new Date().toISOString().split('T')[0],
-      approvedAt: undefined,
-      approvedBy: undefined,
-    };
-    setStructures(p => p.map(x => x.id === s.id ? { ...x, status: 'Archived' as StructureStatus } : x).concat(newer));
-    log('Versioned', 'FeeStructure', newer.id, `Created v${newer.version} from ${s.code}`);
-    setEditing(newer);
-    setShowForm(true);
+  const handleNewVersion = async (s: BackendFeeStructure) => {
+    setBusyId(s.id);
+    try {
+      const created = await newVersionFeeStructure(s.id);
+      toast.success(`Created v${created.version} draft from ${s.name}`);
+      log('Versioned', 'FeeStructure', String(created.id), `Created v${created.version} from ${s.name}`);
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not create a new version.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleSave = async (form: StructFormState) => {
+    setSaving(true);
+    try {
+      const payload = {
+        name: form.name, level: form.level, class_name: form.class_name || null,
+        term: form.term, year: form.year, currency: form.currency,
+        effective_from: form.effective_from, items: form.items,
+      };
+      if (form.id) {
+        await updateFeeStructure(form.id, payload);
+        toast.success('Fee structure updated');
+        log('Updated', 'FeeStructure', String(form.id), `${form.name}`);
+      } else {
+        const created = await createFeeStructure(payload);
+        toast.success('Fee structure created');
+        log('Created', 'FeeStructure', String(created.id), `${created.name}`);
+      }
+      setShowForm(false);
+      setEditing(null);
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not save the fee structure.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center no-print">
-        <p className="text-sm text-muted-foreground">{structures.length} structures · {structures.filter(s => s.status === 'Approved').length} active</p>
+        <p className="text-sm text-muted-foreground">{structures.length} structures · {structures.filter(s => s.status === 'Active').length} active</p>
         <button onClick={() => { setEditing(null); setShowForm(true); }} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90">
           <Plus size={16} /> New Structure
         </button>
@@ -121,9 +229,9 @@ function StructuresTab({ structures, setStructures, log }: { structures: FeeStru
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted">
-                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Code</th>
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">Name</th>
                 <th className="text-left px-3 py-2 font-medium text-muted-foreground">Level / Class</th>
+                <th className="text-left px-3 py-2 font-medium text-muted-foreground">Term</th>
                 <th className="text-center px-3 py-2 font-medium text-muted-foreground">Year</th>
                 <th className="text-center px-3 py-2 font-medium text-muted-foreground">Version</th>
                 <th className="text-right px-3 py-2 font-medium text-muted-foreground">Termly Total</th>
@@ -132,28 +240,32 @@ function StructuresTab({ structures, setStructures, log }: { structures: FeeStru
               </tr>
             </thead>
             <tbody>
+              {structures.length === 0 && (
+                <tr><td colSpan={8} className="text-center py-8 text-muted-foreground">No fee structures yet. Create one to get started.</td></tr>
+              )}
               {structures.map(s => (
                 <tr key={s.id} className="border-b border-border hover:bg-muted/30">
-                  <td className="px-3 py-2 font-mono text-xs text-primary">{s.code}</td>
                   <td className="px-3 py-2">{s.name}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{s.level}{s.className ? ` / ${s.className}` : ''}</td>
-                  <td className="px-3 py-2 text-center">{s.academicYear}</td>
+                  <td className="px-3 py-2 text-muted-foreground">{s.level}{s.class_name ? ` / ${s.class_name}` : ''}</td>
+                  <td className="px-3 py-2">{s.term}</td>
+                  <td className="px-3 py-2 text-center">{s.year}</td>
                   <td className="px-3 py-2 text-center">v{s.version}</td>
                   <td className="px-3 py-2 text-right font-mono">{s.currency} {structureFullTotal(s).toLocaleString()}</td>
                   <td className="px-3 py-2 text-center">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      s.status === 'Approved' ? 'bg-success/10 text-success' :
-                      s.status === 'Pending Approval' ? 'bg-warning/10 text-warning' :
-                      s.status === 'Draft' ? 'bg-muted text-muted-foreground' :
-                      'bg-destructive/10 text-destructive'
-                    }`}>{s.status}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge(s.status)}`}>{s.status}</span>
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2 justify-center">
                       <button onClick={() => setViewing(s)} className="text-primary hover:text-primary/80" title="View"><Eye size={14} /></button>
-                      {s.status === 'Draft' && <button onClick={() => updateStatus(s.id, 'Pending Approval')} className="text-warning text-xs hover:underline">Submit</button>}
-                      {s.status === 'Pending Approval' && <button onClick={() => updateStatus(s.id, 'Approved')} className="text-success text-xs hover:underline">Approve</button>}
-                      {s.status === 'Approved' && <button onClick={() => newVersion(s)} className="text-primary text-xs hover:underline" title="Create new version"><Copy size={14} /></button>}
+                      {s.status === 'Draft' && (
+                        <button disabled={busyId === s.id} onClick={() => { setEditing(s); setShowForm(true); }} className="text-muted-foreground text-xs hover:underline">Edit</button>
+                      )}
+                      {s.status === 'Draft' && (
+                        <button disabled={busyId === s.id} onClick={() => handleActivate(s)} className="text-success text-xs hover:underline">Activate</button>
+                      )}
+                      {s.status === 'Active' && (
+                        <button disabled={busyId === s.id} onClick={() => handleNewVersion(s)} className="text-primary text-xs hover:underline" title="Create new version"><Copy size={14} /></button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -166,15 +278,10 @@ function StructuresTab({ structures, setStructures, log }: { structures: FeeStru
       {showForm && (
         <StructureForm
           initial={editing}
+          accountOptions={accountOptions}
+          saving={saving}
           onClose={() => { setShowForm(false); setEditing(null); }}
-          onSave={(s) => {
-            setStructures(p => {
-              const exists = p.find(x => x.id === s.id);
-              return exists ? p.map(x => x.id === s.id ? s : x) : [...p, s];
-            });
-            log(editing ? 'Updated' : 'Created', 'FeeStructure', s.id, `${s.code} - ${s.name}`);
-            setShowForm(false); setEditing(null);
-          }}
+          onSave={handleSave}
         />
       )}
 
@@ -183,23 +290,28 @@ function StructuresTab({ structures, setStructures, log }: { structures: FeeStru
   );
 }
 
-function StructureForm({ initial, onClose, onSave }: { initial: FeeStructure | null; onClose: () => void; onSave: (s: FeeStructure) => void }) {
-  const [form, setForm] = useState<FeeStructure>(initial ?? {
-    id: `fs-${Date.now()}`,
-    code: `FS-${Date.now().toString().slice(-5)}`,
-    name: '', academicYear: '2026', level: '', currency: 'USD',
-    version: 1, status: 'Draft', effectiveFrom: new Date().toISOString().split('T')[0],
-    items: [], createdBy: 'Current User', createdAt: new Date().toISOString().split('T')[0],
+function StructureForm({ initial, accountOptions, saving, onClose, onSave }: {
+  initial: BackendFeeStructure | null; accountOptions: BackendGLAccount[]; saving: boolean;
+  onClose: () => void; onSave: (s: StructFormState) => void;
+}) {
+  const [form, setForm] = useState<StructFormState>(() => initial ? {
+    id: initial.id, name: initial.name, level: initial.level, class_name: initial.class_name ?? '',
+    term: initial.term, year: initial.year, currency: initial.currency, effective_from: initial.effective_from,
+    items: initial.items.map(i => ({ name: i.name, amount: num(i.amount), gl_account: i.gl_account, mandatory: i.mandatory })),
+  } : {
+    name: '', level: '', class_name: '', term: '', year: String(new Date().getFullYear()),
+    currency: 'USD', effective_from: new Date().toISOString().split('T')[0], items: [],
   });
 
-  const updateItem = (idx: number, patch: Partial<FeeItem>) =>
+  const updateItem = (idx: number, patch: Partial<StructFormState['items'][number]>) =>
     setForm(f => ({ ...f, items: f.items.map((it, i) => i === idx ? { ...it, ...patch } : it) }));
   const addItem = () =>
-    setForm(f => ({ ...f, items: [...f.items, { id: `it-${Date.now()}`, name: '', glAccountCode: revenueAccounts[0]?.code ?? '', amount: 0, cycle: 'Termly', mandatory: true, appliesTo: 'All' }] }));
+    setForm(f => ({ ...f, items: [...f.items, { name: '', amount: 0, gl_account: accountOptions[0]?.id ?? 0, mandatory: true }] }));
   const removeItem = (idx: number) =>
     setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }));
 
-  const valid = form.name && form.level && form.items.length > 0 && form.items.every(i => i.name && i.glAccountCode && i.amount > 0);
+  const valid = form.name && form.level && form.term && form.year && form.items.length > 0 &&
+    form.items.every(i => i.name && i.gl_account && i.amount > 0);
 
   const input = "w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary";
 
@@ -212,26 +324,13 @@ function StructureForm({ initial, onClose, onSave }: { initial: FeeStructure | n
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div><label className="text-xs text-muted-foreground">Code</label><input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} className={input} /></div>
           <div className="sm:col-span-2"><label className="text-xs text-muted-foreground">Structure Name</label><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className={input} placeholder="e.g. Form 3 Boarding - 2026" /></div>
-          <div><label className="text-xs text-muted-foreground">Academic Year</label><input value={form.academicYear} onChange={e => setForm(f => ({ ...f, academicYear: e.target.value }))} className={input} /></div>
-          <div><label className="text-xs text-muted-foreground">Level</label>
-            <select value={form.level ?? ''} onChange={e => setForm(f => ({ ...f, level: e.target.value }))} className={input}>
-              <option value="">Select level...</option>
-              {levels.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
-          </div>
-          <div><label className="text-xs text-muted-foreground">Class (optional)</label>
-            <select value={form.className ?? ''} onChange={e => setForm(f => ({ ...f, className: e.target.value || undefined }))} className={input}>
-              <option value="">All classes in level</option>
-              {classes.filter(c => c.level === form.level).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
-          </div>
-          <div><label className="text-xs text-muted-foreground">Stream</label><input value={form.stream ?? ''} onChange={e => setForm(f => ({ ...f, stream: e.target.value }))} className={input} placeholder="Optional" /></div>
-          <div><label className="text-xs text-muted-foreground">Program</label><input value={form.program ?? ''} onChange={e => setForm(f => ({ ...f, program: e.target.value }))} className={input} placeholder="Optional" /></div>
+          <div><label className="text-xs text-muted-foreground">Academic Year</label><input value={form.year} onChange={e => setForm(f => ({ ...f, year: e.target.value }))} className={input} /></div>
+          <div><label className="text-xs text-muted-foreground">Level</label><input value={form.level} onChange={e => setForm(f => ({ ...f, level: e.target.value }))} className={input} placeholder="e.g. Form 3" /></div>
+          <div><label className="text-xs text-muted-foreground">Class (optional)</label><input value={form.class_name} onChange={e => setForm(f => ({ ...f, class_name: e.target.value }))} className={input} placeholder="All classes in level" /></div>
+          <div><label className="text-xs text-muted-foreground">Term</label><input value={form.term} onChange={e => setForm(f => ({ ...f, term: e.target.value }))} className={input} placeholder="e.g. Term 1" /></div>
           <div><label className="text-xs text-muted-foreground">Currency</label><input value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))} className={input} /></div>
-          <div><label className="text-xs text-muted-foreground">Effective From</label><input type="date" value={form.effectiveFrom} onChange={e => setForm(f => ({ ...f, effectiveFrom: e.target.value }))} className={input} /></div>
-          <div className="sm:col-span-3"><label className="text-xs text-muted-foreground">Notes</label><input value={form.notes ?? ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className={input} /></div>
+          <div><label className="text-xs text-muted-foreground">Effective From</label><input type="date" value={form.effective_from} onChange={e => setForm(f => ({ ...f, effective_from: e.target.value }))} className={input} /></div>
         </div>
 
         <div className="space-y-2">
@@ -241,26 +340,19 @@ function StructureForm({ initial, onClose, onSave }: { initial: FeeStructure | n
           </div>
           {form.items.length === 0 && <p className="text-xs text-muted-foreground py-4 text-center border border-dashed border-border rounded-lg">No fee items yet</p>}
           {form.items.map((it, i) => (
-            <div key={it.id} className="grid grid-cols-12 gap-2 items-end p-2 rounded-lg border border-border">
-              <div className="col-span-3"><label className="text-[10px] text-muted-foreground">Item</label><input value={it.name} onChange={e => updateItem(i, { name: e.target.value })} className={input} placeholder="e.g. Tuition" /></div>
-              <div className="col-span-3"><label className="text-[10px] text-muted-foreground">GL Account</label>
-                <select value={it.glAccountCode} onChange={e => updateItem(i, { glAccountCode: e.target.value })} className={input}>
-                  {revenueAccounts.map(a => <option key={a.code} value={a.code}>{a.code} - {a.name}</option>)}
+            <div key={i} className="grid grid-cols-12 gap-2 items-end p-2 rounded-lg border border-border">
+              <div className="col-span-4"><label className="text-[10px] text-muted-foreground">Item</label><input value={it.name} onChange={e => updateItem(i, { name: e.target.value })} className={input} placeholder="e.g. Tuition" /></div>
+              <div className="col-span-4"><label className="text-[10px] text-muted-foreground">GL Account</label>
+                <select value={it.gl_account} onChange={e => updateItem(i, { gl_account: Number(e.target.value) })} className={input}>
+                  <option value={0}>Select...</option>
+                  {accountOptions.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
                 </select>
               </div>
               <div className="col-span-2"><label className="text-[10px] text-muted-foreground">Amount</label><input type="number" value={it.amount || ''} onChange={e => updateItem(i, { amount: parseFloat(e.target.value) || 0 })} className={input} /></div>
-              <div className="col-span-2"><label className="text-[10px] text-muted-foreground">Cycle</label>
-                <select value={it.cycle} onChange={e => updateItem(i, { cycle: e.target.value as BillingCycle })} className={input}>
-                  {(['Monthly', 'Termly', 'Annual', 'One-time', 'Custom'] as BillingCycle[]).map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="col-span-1"><label className="text-[10px] text-muted-foreground">Applies</label>
-                <select value={it.appliesTo ?? 'All'} onChange={e => updateItem(i, { appliesTo: e.target.value as FeeItem['appliesTo'] })} className={input}>
-                  <option value="All">All</option><option value="Boarding">Boarding</option><option value="Day">Day</option>
-                </select>
-              </div>
               <div className="col-span-1 flex items-center gap-1">
                 <label className="text-[10px] flex items-center gap-1"><input type="checkbox" checked={it.mandatory} onChange={e => updateItem(i, { mandatory: e.target.checked })} />Req</label>
+              </div>
+              <div className="col-span-1 flex justify-end">
                 <button onClick={() => removeItem(i)} className="text-destructive"><Trash2 size={14} /></button>
               </div>
             </div>
@@ -270,14 +362,14 @@ function StructureForm({ initial, onClose, onSave }: { initial: FeeStructure | n
 
         <div className="flex justify-end gap-2 pt-2 border-t border-border">
           <button onClick={onClose} className="px-4 py-2 rounded-lg border border-input text-sm">Cancel</button>
-          <button disabled={!valid} onClick={() => onSave(form)} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm disabled:opacity-50">Save Draft</button>
+          <button disabled={!valid || saving} onClick={() => onSave(form)} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm disabled:opacity-50">{saving ? 'Saving…' : 'Save Draft'}</button>
         </div>
       </div>
     </div>
   );
 }
 
-function StructureView({ structure, onClose }: { structure: FeeStructure; onClose: () => void }) {
+function StructureView({ structure, onClose }: { structure: BackendFeeStructure; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4 no-print">
       <div className="bg-card rounded-xl shadow-xl w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
@@ -287,27 +379,25 @@ function StructureView({ structure, onClose }: { structure: FeeStructure; onClos
         </div>
         <ReportHeader reportTitle={`Fee Schedule - ${structure.name}`} />
         <div className="grid grid-cols-2 gap-2 text-sm">
-          <p><span className="text-muted-foreground">Code:</span> <span className="font-mono">{structure.code}</span></p>
           <p><span className="text-muted-foreground">Version:</span> v{structure.version}</p>
-          <p><span className="text-muted-foreground">Year:</span> {structure.academicYear}</p>
+          <p><span className="text-muted-foreground">Year:</span> {structure.year}</p>
+          <p><span className="text-muted-foreground">Term:</span> {structure.term}</p>
           <p><span className="text-muted-foreground">Level:</span> {structure.level}</p>
           <p><span className="text-muted-foreground">Status:</span> {structure.status}</p>
-          <p><span className="text-muted-foreground">Effective:</span> {structure.effectiveFrom}</p>
+          <p><span className="text-muted-foreground">Effective:</span> {structure.effective_from}</p>
         </div>
         <table className="w-full text-sm">
-          <thead><tr className="border-b bg-muted"><th className="text-left px-3 py-2">Item</th><th className="text-left px-3 py-2">GL Account</th><th className="text-left px-3 py-2">Cycle</th><th className="text-left px-3 py-2">Applies</th><th className="text-right px-3 py-2">Amount</th></tr></thead>
+          <thead><tr className="border-b bg-muted"><th className="text-left px-3 py-2">Item</th><th className="text-left px-3 py-2">GL Account</th><th className="text-right px-3 py-2">Amount</th></tr></thead>
           <tbody>
-            {structure.items.map(i => (
-              <tr key={i.id} className="border-b border-border">
+            {structure.items.map((i, idx) => (
+              <tr key={i.id ?? idx} className="border-b border-border">
                 <td className="px-3 py-2">{i.name} {!i.mandatory && <span className="text-xs text-muted-foreground">(optional)</span>}</td>
-                <td className="px-3 py-2 font-mono text-xs text-primary">{i.glAccountCode}</td>
-                <td className="px-3 py-2">{i.cycle}</td>
-                <td className="px-3 py-2">{i.appliesTo ?? 'All'}</td>
-                <td className="px-3 py-2 text-right font-mono">{structure.currency} {i.amount.toLocaleString()}</td>
+                <td className="px-3 py-2 font-mono text-xs text-primary">{i.gl_account_code ?? i.gl_account}</td>
+                <td className="px-3 py-2 text-right font-mono">{structure.currency} {num(i.amount).toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
-          <tfoot><tr className="font-semibold"><td colSpan={4} className="px-3 py-2">Total Mandatory (per cycle)</td><td className="px-3 py-2 text-right">{structure.currency} {structureTotal(structure).toLocaleString()}</td></tr></tfoot>
+          <tfoot><tr className="font-semibold"><td colSpan={2} className="px-3 py-2">Total Mandatory</td><td className="px-3 py-2 text-right">{structure.currency} {structureTotal(structure).toLocaleString()}</td></tr></tfoot>
         </table>
       </div>
     </div>
@@ -370,17 +460,23 @@ function CalendarTab({ terms, setTerms, log }: { terms: AcademicTerm[]; setTerms
 }
 
 // ============== ASSIGNMENTS TAB ==============
-function AssignmentsTab({ assignments, setAssignments, structures, log }: { assignments: StudentAssignment[]; setAssignments: React.Dispatch<React.SetStateAction<StudentAssignment[]>>; structures: FeeStructure[]; log: (a: string, e: string, id: string, d: string) => void }) {
+function AssignmentsTab({ assignments, setAssignments, structures, students, log }: {
+  assignments: StudentAssignment[]; setAssignments: React.Dispatch<React.SetStateAction<StudentAssignment[]>>;
+  structures: BackendFeeStructure[]; students: BackendStudent[];
+  log: (a: string, e: string, id: string, d: string) => void;
+}) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<Partial<StudentAssignment>>({});
   const input = "w-full px-3 py-2 rounded-lg border border-input bg-background text-sm";
 
+  const activeStructures = structures.filter(s => s.status === 'Active');
+
   const autoSuggest = () => {
-    const unassigned = students.filter(s => !assignments.some(a => a.studentId === s.id));
+    const unassigned = students.filter(s => !assignments.some(a => a.studentId === String(s.id)));
     const created: StudentAssignment[] = [];
     unassigned.forEach(s => {
-      const match = structures.find(st => st.status === 'Approved' && st.level === s.level);
-      if (match) created.push({ id: `a-${Date.now()}-${s.id}`, studentId: s.id, structureId: match.id, assignedAt: new Date().toISOString().split('T')[0] });
+      const match = activeStructures.find(st => st.level === s.level);
+      if (match) created.push({ id: `a-${Date.now()}-${s.id}`, studentId: String(s.id), structureId: String(match.id), assignedAt: new Date().toISOString().split('T')[0] });
     });
     if (created.length) {
       setAssignments(p => [...p, ...created]);
@@ -404,18 +500,18 @@ function AssignmentsTab({ assignments, setAssignments, structures, log }: { assi
             <thead><tr className="border-b bg-muted"><th className="text-left px-3 py-2">Student</th><th className="text-left px-3 py-2">Reg #</th><th className="text-left px-3 py-2">Class</th><th className="text-left px-3 py-2">Structure</th><th className="text-right px-3 py-2">Discount</th><th className="text-right px-3 py-2">Scholarship</th><th className="text-left px-3 py-2">Notes</th><th></th></tr></thead>
             <tbody>
               {assignments.map(a => {
-                const st = students.find(s => s.id === a.studentId);
-                const fs = structures.find(s => s.id === a.structureId);
+                const st = students.find(s => String(s.id) === a.studentId);
+                const fs = structures.find(s => String(s.id) === a.structureId);
                 return (
                   <tr key={a.id} className="border-b border-border">
-                    <td className="px-3 py-2">{st?.firstName} {st?.lastName}</td>
-                    <td className="px-3 py-2 font-mono text-xs">{st?.regNumber}</td>
-                    <td className="px-3 py-2">{st?.className}</td>
-                    <td className="px-3 py-2">{fs?.code}</td>
+                    <td className="px-3 py-2">{st?.first_name} {st?.last_name}</td>
+                    <td className="px-3 py-2 font-mono text-xs">{st?.student_no}</td>
+                    <td className="px-3 py-2">{st?.class_name}</td>
+                    <td className="px-3 py-2">{fs?.name}</td>
                     <td className="px-3 py-2 text-right">{a.discountPercent ? `${a.discountPercent}%` : '-'}</td>
                     <td className="px-3 py-2 text-right">{a.scholarshipAmount ? `$${a.scholarshipAmount}` : '-'}</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{a.notes ?? ''}</td>
-                    <td className="px-3 py-2"><button onClick={() => { setAssignments(p => p.filter(x => x.id !== a.id)); log('Removed', 'Assignment', a.id, `Student ${st?.regNumber}`); }} className="text-destructive"><Trash2 size={14} /></button></td>
+                    <td className="px-3 py-2"><button onClick={() => { setAssignments(p => p.filter(x => x.id !== a.id)); log('Removed', 'Assignment', a.id, `Student ${st?.student_no}`); }} className="text-destructive"><Trash2 size={14} /></button></td>
                   </tr>
                 );
               })}
@@ -431,13 +527,13 @@ function AssignmentsTab({ assignments, setAssignments, structures, log }: { assi
             <div><label className="text-xs text-muted-foreground">Student</label>
               <select value={form.studentId ?? ''} onChange={e => setForm(f => ({ ...f, studentId: e.target.value }))} className={input}>
                 <option value="">Select...</option>
-                {students.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.className})</option>)}
+                {students.map(s => <option key={s.id} value={s.id}>{s.first_name} {s.last_name} ({s.class_name})</option>)}
               </select>
             </div>
             <div><label className="text-xs text-muted-foreground">Fee Structure</label>
               <select value={form.structureId ?? ''} onChange={e => setForm(f => ({ ...f, structureId: e.target.value }))} className={input}>
                 <option value="">Select...</option>
-                {structures.filter(s => s.status === 'Approved').map(s => <option key={s.id} value={s.id}>{s.code} - {s.name}</option>)}
+                {activeStructures.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -450,7 +546,9 @@ function AssignmentsTab({ assignments, setAssignments, structures, log }: { assi
               <button disabled={!form.studentId || !form.structureId} onClick={() => {
                 const a: StudentAssignment = { id: `a-${Date.now()}`, studentId: form.studentId!, structureId: form.structureId!, discountPercent: form.discountPercent, scholarshipAmount: form.scholarshipAmount, notes: form.notes, assignedAt: new Date().toISOString().split('T')[0] };
                 setAssignments(p => [...p, a]);
-                log('Assigned', 'StudentAssignment', a.id, `${students.find(s => s.id === a.studentId)?.regNumber} → ${structures.find(s => s.id === a.structureId)?.code}`);
+                const st = students.find(s => String(s.id) === a.studentId);
+                const fs = structures.find(s => String(s.id) === a.structureId);
+                log('Assigned', 'StudentAssignment', a.id, `${st?.student_no} → ${fs?.name}`);
                 setShowForm(false);
               }} className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-sm disabled:opacity-50">Assign</button>
             </div>
@@ -462,75 +560,70 @@ function AssignmentsTab({ assignments, setAssignments, structures, log }: { assi
 }
 
 // ============== BILLING ENGINE TAB ==============
-function BillingTab({ structures, terms, assignments, invoices, setInvoices, log }: {
-  structures: FeeStructure[]; terms: AcademicTerm[]; assignments: StudentAssignment[];
-  invoices: GeneratedInvoice[]; setInvoices: React.Dispatch<React.SetStateAction<GeneratedInvoice[]>>;
-  log: (a: string, e: string, id: string, d: string) => void;
+function BillingTab({ structures, terms, students, reload, log }: {
+  structures: BackendFeeStructure[]; terms: AcademicTerm[]; students: BackendStudent[];
+  reload: () => Promise<void>; log: (a: string, e: string, id: string, d: string) => void;
 }) {
   const [termId, setTermId] = useState(terms[0]?.id ?? '');
-  const [preview, setPreview] = useState<GeneratedInvoice[]>([]);
+  const [structureId, setStructureId] = useState<number | ''>('');
+  const [billing, setBilling] = useState(false);
+  const [lastResult, setLastResult] = useState<{ structure: string; count: number } | null>(null);
 
-  const generate = () => {
-    const term = terms.find(t => t.id === termId);
-    if (!term) return;
-    const created: GeneratedInvoice[] = [];
-    assignments.forEach((a, idx) => {
-      const fs = structures.find(s => s.id === a.structureId);
-      if (!fs || fs.status !== 'Approved') return;
-      const st = students.find(s => s.id === a.studentId);
-      if (!st) return;
-      const exists = invoices.find(i => i.studentId === a.studentId && i.termId === term.id && i.structureId === fs.id);
-      if (exists) return;
-      created.push(generateInvoiceForAssignment(a, fs, term, st.boardingStatus as 'Boarding' | 'Day', idx + 1));
-    });
-    setPreview(created);
+  const activeStructures = structures.filter(s => s.status === 'Active');
+
+  const runBilling = async () => {
+    if (!structureId) {
+      toast.error('Select an active fee structure to bill.');
+      return;
+    }
+    setBilling(true);
+    try {
+      const { count } = await billStudentsForFeeStructure(Number(structureId));
+      const fs = structures.find(s => s.id === structureId);
+      setLastResult({ structure: fs?.name ?? String(structureId), count });
+      toast.success(`Generated ${count} invoice(s), posted to AR & GL`);
+      log('Auto-Posted', 'Invoice', String(structureId), `Billed ${count} students for ${fs?.name}`);
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not run the billing engine.');
+    } finally {
+      setBilling(false);
+    }
   };
-
-  const post = () => {
-    if (!preview.length) return;
-    setInvoices(p => [...preview, ...p]);
-    log('Auto-Posted', 'Invoice', termId, `Generated ${preview.length} invoices, posted to AR & GL (Dr 1200 / Cr 4xxx)`);
-    setPreview([]);
-  };
-
-  const totalPreview = preview.reduce((s, i) => s + i.total, 0);
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader><CardTitle className="text-base flex items-center gap-2"><PlayCircle size={18} /> Automated Billing Engine</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">Select an academic term — the engine will auto-generate invoices for every assigned student, applying discounts/scholarships, and post entries to Accounts Receivable & General Ledger.</p>
+          <p className="text-sm text-muted-foreground">Select an active fee structure — the server will generate invoices for every matching student and post entries to Accounts Receivable & General Ledger.</p>
           <div className="flex flex-wrap gap-2 items-end">
             <div>
-              <label className="text-xs text-muted-foreground">Term</label>
+              <label className="text-xs text-muted-foreground">Term (reference)</label>
               <select value={termId} onChange={e => setTermId(e.target.value)} className="px-3 py-2 rounded-lg border border-input bg-background text-sm">
                 {terms.map(t => <option key={t.id} value={t.id}>{t.name} (bills {t.billingDate})</option>)}
               </select>
             </div>
-            <button onClick={generate} className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm">Preview Run</button>
-            {preview.length > 0 && <button onClick={post} className="px-4 py-2 rounded-lg bg-success text-success-foreground text-sm"><Check size={14} className="inline mr-1" /> Post {preview.length} Invoices</button>}
+            <div>
+              <label className="text-xs text-muted-foreground">Active Fee Structure</label>
+              <select value={structureId} onChange={e => setStructureId(e.target.value ? Number(e.target.value) : '')} className="px-3 py-2 rounded-lg border border-input bg-background text-sm">
+                <option value="">Select...</option>
+                {activeStructures.map(s => <option key={s.id} value={s.id}>{s.name} ({s.level}{s.class_name ? `/${s.class_name}` : ''}, {s.term} {s.year})</option>)}
+              </select>
+            </div>
+            <button disabled={billing} onClick={runBilling} className="px-4 py-2 rounded-lg bg-success text-success-foreground text-sm disabled:opacity-60">
+              <Check size={14} className="inline mr-1" /> {billing ? 'Billing…' : 'Bill Students'}
+            </button>
           </div>
 
-          {preview.length > 0 && (
-            <div className="border border-border rounded-lg overflow-hidden">
-              <div className="bg-muted px-3 py-2 text-sm font-medium flex justify-between"><span>Preview — {preview.length} invoices</span><span>Total: ${totalPreview.toLocaleString()}</span></div>
-              <table className="w-full text-xs">
-                <thead><tr className="border-b border-border"><th className="text-left px-3 py-2">Invoice #</th><th className="text-left px-3 py-2">Student</th><th className="text-left px-3 py-2">Lines</th><th className="text-right px-3 py-2">Subtotal</th><th className="text-right px-3 py-2">Disc</th><th className="text-right px-3 py-2">Total</th></tr></thead>
-                <tbody>
-                  {preview.map(i => { const st = students.find(s => s.id === i.studentId); return (
-                    <tr key={i.id} className="border-b border-border">
-                      <td className="px-3 py-2 font-mono text-primary">{i.invoiceNumber}</td>
-                      <td className="px-3 py-2">{st?.firstName} {st?.lastName}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{i.lines.length} item(s)</td>
-                      <td className="px-3 py-2 text-right">${i.subtotal.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right text-warning">${i.discount.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right font-semibold">${i.total.toLocaleString()}</td>
-                    </tr>
-                  ); })}
-                </tbody>
-              </table>
+          {lastResult && (
+            <div className="border border-border rounded-lg p-3 text-sm bg-muted/30">
+              Generated <strong>{lastResult.count}</strong> invoice(s) for <strong>{lastResult.structure}</strong>.
             </div>
+          )}
+
+          {activeStructures.length === 0 && (
+            <p className="text-xs text-warning">No active fee structures yet — activate one from the Fee Structures tab first.</p>
           )}
         </CardContent>
       </Card>
@@ -539,8 +632,8 @@ function BillingTab({ structures, terms, assignments, invoices, setInvoices, log
         <CardHeader><CardTitle className="text-base">Integration Status</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
           {[
-            { l: 'General Ledger', v: 'Connected', g: '4000, 4100, 4200' },
-            { l: 'Accounts Receivable', v: 'Connected', g: 'GL 1200 - Debtors' },
+            { l: 'General Ledger', v: 'Connected', g: 'Revenue GL accounts' },
+            { l: 'Accounts Receivable', v: 'Connected', g: 'Invoices created server-side' },
             { l: 'Student Information', v: 'Connected', g: `${students.length} students` },
             { l: 'Academic Calendar', v: 'Connected', g: `${terms.length} terms` },
           ].map(x => (
@@ -557,7 +650,11 @@ function BillingTab({ structures, terms, assignments, invoices, setInvoices, log
 }
 
 // ============== INVOICES TAB ==============
-function InvoicesTab({ invoices, setInvoices, structures, log }: { invoices: GeneratedInvoice[]; setInvoices: React.Dispatch<React.SetStateAction<GeneratedInvoice[]>>; structures: FeeStructure[]; log: (a: string, e: string, id: string, d: string) => void }) {
+function InvoicesTab({ invoices, setInvoices, structures, students, log }: {
+  invoices: GeneratedInvoice[]; setInvoices: React.Dispatch<React.SetStateAction<GeneratedInvoice[]>>;
+  structures: BackendFeeStructure[]; students: BackendStudent[];
+  log: (a: string, e: string, id: string, d: string) => void;
+}) {
   const [view, setView] = useState<GeneratedInvoice | null>(null);
   const total = invoices.reduce((s, i) => s + i.total, 0);
 
@@ -571,17 +668,21 @@ function InvoicesTab({ invoices, setInvoices, structures, log }: { invoices: Gen
       </div>
       <Card>
         <CardContent className="pt-4 overflow-x-auto">
-          {invoices.length === 0 ? <p className="text-sm text-muted-foreground py-8 text-center">No invoices generated yet. Run the Billing Engine.</p> : (
+          {invoices.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              Invoices generated via the Billing Engine are created directly on the server — check the Invoices page for the live list and AR balances.
+            </p>
+          ) : (
             <table className="w-full text-sm">
               <thead><tr className="border-b bg-muted"><th className="text-left px-3 py-2">Invoice #</th><th className="text-left px-3 py-2">Date</th><th className="text-left px-3 py-2">Due</th><th className="text-left px-3 py-2">Student</th><th className="text-left px-3 py-2">Structure</th><th className="text-right px-3 py-2">Total</th><th className="text-center px-3 py-2">Status</th><th></th></tr></thead>
               <tbody>
-                {invoices.map(i => { const st = students.find(s => s.id === i.studentId); const fs = structures.find(s => s.id === i.structureId); return (
+                {invoices.map(i => { const st = students.find(s => String(s.id) === i.studentId); const fs = structures.find(s => String(s.id) === i.structureId); return (
                   <tr key={i.id} className="border-b border-border">
                     <td className="px-3 py-2 font-mono text-primary">{i.invoiceNumber}</td>
                     <td className="px-3 py-2">{i.date}</td>
                     <td className="px-3 py-2">{i.dueDate}</td>
-                    <td className="px-3 py-2">{st?.firstName} {st?.lastName}</td>
-                    <td className="px-3 py-2 text-xs">{fs?.code}</td>
+                    <td className="px-3 py-2">{st?.first_name} {st?.last_name}</td>
+                    <td className="px-3 py-2 text-xs">{fs?.name}</td>
                     <td className="px-3 py-2 text-right font-mono">${i.total.toLocaleString()}</td>
                     <td className="px-3 py-2 text-center"><span className={`px-2 py-0.5 rounded-full text-xs ${i.status === 'Posted' ? 'bg-primary/10 text-primary' : i.status === 'Paid' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>{i.status}</span></td>
                     <td className="px-3 py-2 flex gap-2">
@@ -602,7 +703,7 @@ function InvoicesTab({ invoices, setInvoices, structures, log }: { invoices: Gen
             <div className="flex justify-between"><h3 className="font-bold">Invoice {view.invoiceNumber}</h3><div className="flex gap-2"><button onClick={() => window.print()}><Printer size={18} /></button><button onClick={() => setView(null)}><X size={18} /></button></div></div>
             <ReportHeader reportTitle="Tax Invoice" />
             <div className="grid grid-cols-2 text-sm gap-2">
-              <p>Student: <strong>{students.find(s => s.id === view.studentId)?.firstName} {students.find(s => s.id === view.studentId)?.lastName}</strong></p>
+              <p>Student: <strong>{students.find(s => String(s.id) === view.studentId)?.first_name} {students.find(s => String(s.id) === view.studentId)?.last_name}</strong></p>
               <p>Date: {view.date}</p>
               <p>Due: {view.dueDate}</p>
               <p>Auto: {view.autoGenerated ? 'Yes' : 'No'}</p>
@@ -623,7 +724,7 @@ function InvoicesTab({ invoices, setInvoices, structures, log }: { invoices: Gen
 }
 
 // ============== AGING TAB ==============
-function AgingTab({ invoices }: { invoices: GeneratedInvoice[] }) {
+function AgingTab({ invoices, students }: { invoices: GeneratedInvoice[]; students: BackendStudent[] }) {
   const buckets = useMemo(() => agingBuckets(invoices), [invoices]);
   const totalOutstanding = Object.values(buckets).reduce((s, v) => s + v, 0);
   return (
@@ -642,13 +743,13 @@ function AgingTab({ invoices }: { invoices: GeneratedInvoice[] }) {
             <thead><tr className="border-b bg-muted"><th className="text-left px-3 py-2">Student</th><th className="text-right px-3 py-2">Current</th><th className="text-right px-3 py-2">1-30</th><th className="text-right px-3 py-2">31-60</th><th className="text-right px-3 py-2">61-90</th><th className="text-right px-3 py-2">90+</th><th className="text-right px-3 py-2">Total</th></tr></thead>
             <tbody>
               {students.map(s => {
-                const studentInvs = invoices.filter(i => i.studentId === s.id && i.status !== 'Paid' && i.status !== 'Cancelled');
+                const studentInvs = invoices.filter(i => i.studentId === String(s.id) && i.status !== 'Paid' && i.status !== 'Cancelled');
                 const b = agingBuckets(studentInvs);
                 const total = b.current + b.b30 + b.b60 + b.b90 + b.over90;
                 if (total === 0) return null;
                 return (
                   <tr key={s.id} className="border-b border-border">
-                    <td className="px-3 py-2">{s.firstName} {s.lastName}</td>
+                    <td className="px-3 py-2">{s.first_name} {s.last_name}</td>
                     <td className="px-3 py-2 text-right">${b.current.toLocaleString()}</td>
                     <td className="px-3 py-2 text-right">${b.b30.toLocaleString()}</td>
                     <td className="px-3 py-2 text-right text-warning">${b.b60.toLocaleString()}</td>
@@ -673,20 +774,24 @@ function AuditTab({ audit }: { audit: AuditEntry[] }) {
     <Card>
       <CardHeader><CardTitle className="text-base flex items-center gap-2"><History size={18} /> Audit Trail</CardTitle></CardHeader>
       <CardContent>
-        <table className="w-full text-sm">
-          <thead><tr className="border-b bg-muted"><th className="text-left px-3 py-2">Timestamp</th><th className="text-left px-3 py-2">Actor</th><th className="text-left px-3 py-2">Action</th><th className="text-left px-3 py-2">Entity</th><th className="text-left px-3 py-2">Details</th></tr></thead>
-          <tbody>
-            {audit.map(a => (
-              <tr key={a.id} className="border-b border-border">
-                <td className="px-3 py-2 font-mono text-xs">{a.timestamp}</td>
-                <td className="px-3 py-2">{a.actor}</td>
-                <td className="px-3 py-2"><span className="px-2 py-0.5 rounded text-xs bg-primary/10 text-primary">{a.action}</span></td>
-                <td className="px-3 py-2 text-muted-foreground">{a.entity}</td>
-                <td className="px-3 py-2 text-xs">{a.details}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {audit.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">No actions recorded yet this session.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead><tr className="border-b bg-muted"><th className="text-left px-3 py-2">Timestamp</th><th className="text-left px-3 py-2">Actor</th><th className="text-left px-3 py-2">Action</th><th className="text-left px-3 py-2">Entity</th><th className="text-left px-3 py-2">Details</th></tr></thead>
+            <tbody>
+              {audit.map(a => (
+                <tr key={a.id} className="border-b border-border">
+                  <td className="px-3 py-2 font-mono text-xs">{a.timestamp}</td>
+                  <td className="px-3 py-2">{a.actor}</td>
+                  <td className="px-3 py-2"><span className="px-2 py-0.5 rounded text-xs bg-primary/10 text-primary">{a.action}</span></td>
+                  <td className="px-3 py-2 text-muted-foreground">{a.entity}</td>
+                  <td className="px-3 py-2 text-xs">{a.details}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </CardContent>
     </Card>
   );

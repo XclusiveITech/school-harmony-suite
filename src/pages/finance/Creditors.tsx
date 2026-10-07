@@ -1,235 +1,219 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import ReportHeader from '@/components/ReportHeader';
 import ReportFilters from '@/components/ReportFilters';
-import { glAccounts } from '@/lib/dummy-data';
+import { toast } from 'sonner';
+import { listGLAccounts, num, type BackendGLAccount } from '@/lib/finance-api';
 import {
-  Plus, Search, Printer, Download, Eye, X, Check, Edit2, FileText,
-  Users, Clock, AlertTriangle, CheckCircle2, Trash2
+  listSuppliers, createSupplier, updateSupplier,
+  listSupplierBills, createSupplierBill,
+  listSupplierPayments, createSupplierPayment,
+  billBalance,
+  type BackendSupplier, type BackendSupplierBill, type BackendSupplierPayment,
+} from '@/lib/payables-api';
+import {
+  Plus, Search, Printer, Download, Eye, Check, Edit2, FileText,
+  AlertTriangle, RefreshCw,
 } from 'lucide-react';
 
-// Types
-interface Supplier {
-  id: string;
-  code: string;
-  name: string;
-  contact: string;
-  phone: string;
-  email: string;
-  address: string;
-  bankDetails: string;
-  taxNumber: string;
-  paymentTerms: number; // days
-  status: 'Active' | 'Inactive';
-}
-
-interface SupplierInvoice {
-  id: string;
-  supplierId: string;
-  invoiceNumber: string;
-  date: string;
-  dueDate: string;
-  glAccountCode: string;
-  description: string;
-  amount: number;
-  paid: number;
-  balance: number;
-  currency: string;
-  status: 'Outstanding' | 'Partially Paid' | 'Paid' | 'Cancelled';
-}
-
-interface SupplierPayment {
-  id: string;
-  supplierId: string;
-  invoiceId: string;
-  date: string;
-  reference: string;
-  amount: number;
-  paymentMode: string;
-  currency: string;
-  description: string;
-  status: 'Pending' | 'Processed';
-}
-
-// Dummy data
-const initialSuppliers: Supplier[] = [
-  { id: 's1', code: 'SUP001', name: 'ABC Stationery Supplies', contact: 'John Smith', phone: '+263771112233', email: 'abc@supplies.com', address: '12 Industrial Rd, Harare', bankDetails: 'FBC Acc: 1234567890', taxNumber: 'TIN-001234', paymentTerms: 30, status: 'Active' },
-  { id: 's2', code: 'SUP002', name: 'National Foods Ltd', contact: 'Mary Jones', phone: '+263772223344', email: 'orders@natfoods.co.zw', address: '45 Robert Mugabe Rd, Harare', bankDetails: 'CBZ Acc: 9876543210', taxNumber: 'TIN-005678', paymentTerms: 30, status: 'Active' },
-  { id: 's3', code: 'SUP003', name: 'Mega Office Furniture', contact: 'Peter Brown', phone: '+263773334455', email: 'sales@megaoffice.co.zw', address: '78 Samora Machel Ave', bankDetails: 'Stanbic Acc: 5555666677', taxNumber: 'TIN-009012', paymentTerms: 45, status: 'Active' },
-  { id: 's4', code: 'SUP004', name: 'ZESA Holdings', contact: 'Billing Dept', phone: '+263774445566', email: 'billing@zesa.co.zw', address: 'Electricity Centre, Harare', bankDetails: 'ZB Acc: 1111222233', taxNumber: 'TIN-003456', paymentTerms: 14, status: 'Active' },
-  { id: 's5', code: 'SUP005', name: 'NetOne Telecoms', contact: 'Corporate', phone: '+263775556677', email: 'corporate@netone.co.zw', address: 'NetOne Centre, Harare', bankDetails: 'CABS Acc: 4444555566', taxNumber: 'TIN-007890', paymentTerms: 30, status: 'Active' },
-];
-
-const initialInvoices: SupplierInvoice[] = [
-  { id: 'si1', supplierId: 's1', invoiceNumber: 'ABC-1045', date: '2026-02-15', dueDate: '2026-03-17', glAccountCode: '5200', description: 'Exercise books & pens', amount: 2500, paid: 1500, balance: 1000, currency: 'USD', status: 'Partially Paid' },
-  { id: 'si2', supplierId: 's1', invoiceNumber: 'ABC-1078', date: '2026-03-01', dueDate: '2026-03-31', glAccountCode: '5200', description: 'Chalk & markers', amount: 3500, paid: 0, balance: 3500, currency: 'USD', status: 'Outstanding' },
-  { id: 'si3', supplierId: 's2', invoiceNumber: 'NF-8821', date: '2026-01-20', dueDate: '2026-02-20', glAccountCode: '5200', description: 'Catering supplies - Jan', amount: 4200, paid: 4200, balance: 0, currency: 'USD', status: 'Paid' },
-  { id: 'si4', supplierId: 's2', invoiceNumber: 'NF-8890', date: '2026-02-20', dueDate: '2026-03-22', glAccountCode: '5200', description: 'Catering supplies - Feb', amount: 4800, paid: 2000, balance: 2800, currency: 'USD', status: 'Partially Paid' },
-  { id: 'si5', supplierId: 's2', invoiceNumber: 'NF-8945', date: '2026-03-20', dueDate: '2026-04-20', glAccountCode: '5200', description: 'Catering supplies - Mar', amount: 5400, paid: 0, balance: 5400, currency: 'USD', status: 'Outstanding' },
-  { id: 'si6', supplierId: 's3', invoiceNumber: 'MOF-456', date: '2026-03-10', dueDate: '2026-04-24', glAccountCode: '1500', description: 'Classroom desks & chairs', amount: 3500, paid: 0, balance: 3500, currency: 'USD', status: 'Outstanding' },
-  { id: 'si7', supplierId: 's4', invoiceNumber: 'ZESA-0326', date: '2026-03-01', dueDate: '2026-03-15', glAccountCode: '5100', description: 'Electricity - March', amount: 1500, paid: 0, balance: 1500, currency: 'USD', status: 'Outstanding' },
-  { id: 'si8', supplierId: 's5', invoiceNumber: 'N1-7890', date: '2026-03-05', dueDate: '2026-04-04', glAccountCode: '5100', description: 'Internet & phone - March', amount: 650, paid: 0, balance: 650, currency: 'USD', status: 'Outstanding' },
-];
-
-const initialPayments: SupplierPayment[] = [
-  { id: 'sp1', supplierId: 's1', invoiceId: 'si1', date: '2026-03-05', reference: 'PAY-S001', amount: 1500, paymentMode: 'Bank Transfer', currency: 'USD', description: 'Partial payment - ABC Stationery', status: 'Processed' },
-  { id: 'sp2', supplierId: 's2', invoiceId: 'si3', date: '2026-02-10', reference: 'PAY-S002', amount: 4200, paymentMode: 'Bank Transfer', currency: 'USD', description: 'Full payment - NF Jan invoice', status: 'Processed' },
-  { id: 'sp3', supplierId: 's2', invoiceId: 'si4', date: '2026-02-28', reference: 'PAY-S003', amount: 2000, paymentMode: 'Bank Transfer', currency: 'USD', description: 'Partial payment - NF Feb invoice', status: 'Processed' },
-];
-
 const paymentModes = ['Cash', 'Bank Transfer', 'EcoCash', 'Cheque', 'POS/Card'];
-const expenseAccounts = glAccounts.filter(a => a.type === 'Expense' || a.type === 'Asset');
+const todayStr = () => new Date().toISOString().split('T')[0];
 
 export default function Creditors() {
-  const [suppliers, setSuppliers] = useState(initialSuppliers);
-  const [invoices, setInvoices] = useState(initialInvoices);
-  const [payments, setPayments] = useState(initialPayments);
-  const [dateFrom, setDateFrom] = useState('2026-01-01');
-  const [dateTo, setDateTo] = useState('2026-03-31');
+  const [suppliers, setSuppliers] = useState<BackendSupplier[]>([]);
+  const [bills, setBills] = useState<BackendSupplierBill[]>([]);
+  const [payments, setPayments] = useState<BackendSupplierPayment[]>([]);
+  const [glAccounts, setGlAccounts] = useState<BackendGLAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [dateFrom, setDateFrom] = useState('2000-01-01');
+  const [dateTo, setDateTo] = useState('2100-12-31');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('all');
   const [showSupplierForm, setShowSupplierForm] = useState(false);
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [viewStatement, setViewStatement] = useState<string | null>(null);
-  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [editingSupplier, setEditingSupplier] = useState<BackendSupplier | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  // Supplier form
   const [supForm, setSupForm] = useState({ code: '', name: '', contact: '', phone: '', email: '', address: '', bankDetails: '', taxNumber: '', paymentTerms: '30' });
+  const [invForm, setInvForm] = useState({ supplierId: '', invoiceNumber: '', date: todayStr(), glAccountCode: '', description: '', amount: '', currency: 'USD' });
+  const [payForm, setPayForm] = useState({ supplierId: '', invoiceId: '', date: todayStr(), amount: '', paymentMode: '', description: '' });
 
-  // Invoice form
-  const [invForm, setInvForm] = useState({ supplierId: '', invoiceNumber: '', date: new Date().toISOString().split('T')[0], glAccountCode: '', description: '', amount: '', currency: 'USD' });
+  const expenseAccounts = glAccounts.filter(a => a.type === 'Expense' || a.type === 'Asset');
 
-  // Payment form
-  const [payForm, setPayForm] = useState({ supplierId: '', invoiceId: '', date: new Date().toISOString().split('T')[0], amount: '', paymentMode: '', description: '' });
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [s, b, p, g] = await Promise.all([
+        listSuppliers(), listSupplierBills(), listSupplierPayments(), listGLAccounts(),
+      ]);
+      setSuppliers(s);
+      setBills(b);
+      setPayments(p);
+      setGlAccounts(g);
+    } catch (e: any) {
+      setError(e?.message || 'Could not load creditors data from the server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  // Totals
-  const totalOutstanding = invoices.reduce((s, i) => s + i.balance, 0);
-  const totalPaid = payments.filter(p => p.status === 'Processed').reduce((s, p) => s + p.amount, 0);
-  const totalInvoiced = invoices.reduce((s, i) => s + i.amount, 0);
+  const billStatusLabel = (b: BackendSupplierBill) => b.status === 'Unpaid' ? 'Outstanding' : b.status === 'Partial' ? 'Partially Paid' : b.status;
 
-  // Aging
+  const totalOutstanding = bills.reduce((s, b) => s + billBalance(b), 0);
+  const totalPaid = payments.reduce((s, p) => s + num(p.amount), 0);
+  const totalInvoiced = bills.reduce((s, b) => s + num(b.amount), 0);
+
   const aging = useMemo(() => {
-    const today = new Date('2026-03-27');
+    const today = new Date();
     const b = { current: 0, days30: 0, days60: 0, days90: 0, over90: 0, total: 0 };
-    invoices.filter(i => i.balance > 0).forEach(inv => {
-      const days = Math.floor((today.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-      if (days <= 0) b.current += inv.balance;
-      else if (days <= 30) b.days30 += inv.balance;
-      else if (days <= 60) b.days60 += inv.balance;
-      else if (days <= 90) b.days90 += inv.balance;
-      else b.over90 += inv.balance;
-      b.total += inv.balance;
+    bills.filter(bi => billBalance(bi) > 0 && bi.status !== 'Cancelled').forEach(bi => {
+      const balance = billBalance(bi);
+      const days = Math.floor((today.getTime() - new Date(bi.due_date).getTime()) / (1000 * 60 * 60 * 24));
+      if (days <= 0) b.current += balance;
+      else if (days <= 30) b.days30 += balance;
+      else if (days <= 60) b.days60 += balance;
+      else if (days <= 90) b.days90 += balance;
+      else b.over90 += balance;
+      b.total += balance;
     });
     return b;
-  }, [invoices]);
+  }, [bills]);
 
-  // Filtered invoices
-  const filteredInvoices = invoices.filter(inv => {
-    if (selectedSupplier !== 'all' && inv.supplierId !== selectedSupplier) return false;
-    if (searchTerm && !inv.description.toLowerCase().includes(searchTerm.toLowerCase()) && !inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    if (inv.date < dateFrom || inv.date > dateTo) return false;
+  const filteredBills = bills.filter(b => {
+    if (selectedSupplier !== 'all' && String(b.supplier) !== selectedSupplier) return false;
+    if (searchTerm && !b.description?.toLowerCase().includes(searchTerm.toLowerCase()) && !b.bill_no.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (b.date < dateFrom || b.date > dateTo) return false;
     return true;
   });
 
-  // Save supplier
-  const handleSaveSupplier = () => {
-    if (!supForm.code || !supForm.name) return;
-    if (editingSupplier) {
-      setSuppliers(prev => prev.map(s => s.id === editingSupplier.id ? { ...s, ...supForm, paymentTerms: parseInt(supForm.paymentTerms) || 30 } : s));
-    } else {
-      setSuppliers(prev => [...prev, { id: String(Date.now()), ...supForm, paymentTerms: parseInt(supForm.paymentTerms) || 30, status: 'Active' as const }]);
+  const supplierName = (id: number) => suppliers.find(s => s.id === id)?.name || `#${id}`;
+
+  const handleSaveSupplier = async () => {
+    if (!supForm.code || !supForm.name) {
+      toast.error('Supplier code and name are required.');
+      return;
     }
-    setSupForm({ code: '', name: '', contact: '', phone: '', email: '', address: '', bankDetails: '', taxNumber: '', paymentTerms: '30' });
-    setShowSupplierForm(false);
-    setEditingSupplier(null);
+    setSaving(true);
+    try {
+      const input = {
+        code: supForm.code, name: supForm.name, contact: supForm.contact, phone: supForm.phone,
+        email: supForm.email, address: supForm.address, bank_details: supForm.bankDetails,
+        tax_number: supForm.taxNumber, payment_terms: parseInt(supForm.paymentTerms) || 30,
+      };
+      if (editingSupplier) {
+        await updateSupplier(editingSupplier.id, input);
+        toast.success('Supplier updated');
+      } else {
+        await createSupplier({ ...input, status: 'Active' });
+        toast.success('Supplier created');
+      }
+      setSupForm({ code: '', name: '', contact: '', phone: '', email: '', address: '', bankDetails: '', taxNumber: '', paymentTerms: '30' });
+      setShowSupplierForm(false);
+      setEditingSupplier(null);
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not save the supplier.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // Save invoice
-  const handleSaveInvoice = () => {
-    if (!invForm.supplierId || !invForm.invoiceNumber || !invForm.amount || !invForm.glAccountCode) return;
-    const sup = suppliers.find(s => s.id === invForm.supplierId);
-    const amt = parseFloat(invForm.amount);
-    const dueDate = new Date(invForm.date);
-    dueDate.setDate(dueDate.getDate() + (sup?.paymentTerms || 30));
-    setInvoices(prev => [...prev, {
-      id: String(Date.now()),
-      supplierId: invForm.supplierId,
-      invoiceNumber: invForm.invoiceNumber,
-      date: invForm.date,
-      dueDate: dueDate.toISOString().split('T')[0],
-      glAccountCode: invForm.glAccountCode,
-      description: invForm.description,
-      amount: amt,
-      paid: 0,
-      balance: amt,
-      currency: invForm.currency,
-      status: 'Outstanding' as const,
-    }]);
-    setInvForm({ supplierId: '', invoiceNumber: '', date: new Date().toISOString().split('T')[0], glAccountCode: '', description: '', amount: '', currency: 'USD' });
-    setShowInvoiceForm(false);
+  const handleSaveInvoice = async () => {
+    if (!invForm.supplierId || !invForm.invoiceNumber || !invForm.amount || !invForm.glAccountCode) {
+      toast.error('Supplier, invoice number, GL account and amount are required.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const sup = suppliers.find(s => String(s.id) === invForm.supplierId);
+      const amt = parseFloat(invForm.amount);
+      const dueDate = new Date(invForm.date);
+      dueDate.setDate(dueDate.getDate() + (num(sup?.payment_terms) || 30));
+      await createSupplierBill({
+        supplier: parseInt(invForm.supplierId),
+        bill_no: invForm.invoiceNumber,
+        date: invForm.date,
+        due_date: dueDate.toISOString().split('T')[0],
+        amount: amt,
+        currency: invForm.currency,
+        description: invForm.description,
+        gl_account_code: invForm.glAccountCode,
+        status: 'Unpaid',
+      });
+      toast.success('Supplier bill captured');
+      setInvForm({ supplierId: '', invoiceNumber: '', date: todayStr(), glAccountCode: '', description: '', amount: '', currency: 'USD' });
+      setShowInvoiceForm(false);
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not save the supplier bill.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // Save payment
-  const handleSavePayment = () => {
-    if (!payForm.supplierId || !payForm.invoiceId || !payForm.amount || !payForm.paymentMode) return;
-    const amt = parseFloat(payForm.amount);
-    const inv = invoices.find(i => i.id === payForm.invoiceId);
-    if (!inv) return;
-
-    setPayments(prev => [...prev, {
-      id: String(Date.now()),
-      supplierId: payForm.supplierId,
-      invoiceId: payForm.invoiceId,
-      date: payForm.date,
-      reference: `PAY-S${String(prev.length + 1).padStart(3, '0')}`,
-      amount: amt,
-      paymentMode: payForm.paymentMode,
-      currency: inv.currency,
-      description: payForm.description || `Payment for ${inv.invoiceNumber}`,
-      status: 'Processed' as const,
-    }]);
-
-    // Update invoice
-    const newPaid = inv.paid + amt;
-    const newBalance = inv.amount - newPaid;
-    setInvoices(prev => prev.map(i => i.id === payForm.invoiceId ? {
-      ...i, paid: newPaid, balance: Math.max(0, newBalance),
-      status: newBalance <= 0 ? 'Paid' : 'Partially Paid',
-    } : i));
-
-    setPayForm({ supplierId: '', invoiceId: '', date: new Date().toISOString().split('T')[0], amount: '', paymentMode: '', description: '' });
-    setShowPaymentForm(false);
+  const handleSavePayment = async () => {
+    if (!payForm.supplierId || !payForm.invoiceId || !payForm.amount || !payForm.paymentMode) {
+      toast.error('Supplier, invoice, amount and payment mode are required.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const bill = bills.find(b => String(b.id) === payForm.invoiceId);
+      await createSupplierPayment({
+        supplier: parseInt(payForm.supplierId),
+        bill: payForm.invoiceId ? parseInt(payForm.invoiceId) : null,
+        date: payForm.date,
+        amount: parseFloat(payForm.amount),
+        method: payForm.paymentMode,
+        description: payForm.description || `Payment for ${bill?.bill_no ?? ''}`,
+      });
+      toast.success('Payment recorded');
+      setPayForm({ supplierId: '', invoiceId: '', date: todayStr(), amount: '', paymentMode: '', description: '' });
+      setShowPaymentForm(false);
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not record the payment.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const openEditSupplier = (s: Supplier) => {
+  const openEditSupplier = (s: BackendSupplier) => {
     setEditingSupplier(s);
-    setSupForm({ code: s.code, name: s.name, contact: s.contact, phone: s.phone, email: s.email, address: s.address, bankDetails: s.bankDetails, taxNumber: s.taxNumber, paymentTerms: String(s.paymentTerms) });
+    setSupForm({
+      code: s.code, name: s.name, contact: s.contact || '', phone: s.phone || '', email: s.email || '',
+      address: s.address || '', bankDetails: s.bank_details || '', taxNumber: s.tax_number || '',
+      paymentTerms: String(s.payment_terms ?? 30),
+    });
     setShowSupplierForm(true);
   };
 
-  // Statement data for a supplier
   const getStatementData = (supplierId: string) => {
-    const supInvoices = invoices.filter(i => i.supplierId === supplierId).sort((a, b) => a.date.localeCompare(b.date));
-    const supPayments = payments.filter(p => p.supplierId === supplierId && p.status === 'Processed').sort((a, b) => a.date.localeCompare(b.date));
-    const lines: { date: string; ref: string; description: string; debit: number; credit: number; balance: number }[] = [];
-    let running = 0;
+    const supBills = bills.filter(b => String(b.supplier) === supplierId).sort((a, b) => a.date.localeCompare(b.date));
+    const supPayments = payments.filter(p => String(p.supplier) === supplierId).sort((a, b) => a.date.localeCompare(b.date));
     const all = [
-      ...supInvoices.map(i => ({ date: i.date, ref: i.invoiceNumber, description: i.description, debit: i.amount, credit: 0, type: 'inv' as const })),
-      ...supPayments.map(p => ({ date: p.date, ref: p.reference, description: p.description, debit: 0, credit: p.amount, type: 'pay' as const })),
+      ...supBills.map(b => ({ date: b.date, ref: b.bill_no, description: b.description, debit: num(b.amount), credit: 0 })),
+      ...supPayments.map(p => ({ date: p.date, ref: p.reference || '', description: p.description || '', debit: 0, credit: num(p.amount) })),
     ].sort((a, b) => a.date.localeCompare(b.date));
-    all.forEach(item => {
+    let running = 0;
+    return all.map(item => {
       running += item.debit - item.credit;
-      lines.push({ ...item, balance: running });
+      return { ...item, balance: running };
     });
-    return lines;
   };
 
   const supplierInvoicesForPayment = payForm.supplierId
-    ? invoices.filter(i => i.supplierId === payForm.supplierId && i.balance > 0)
+    ? bills.filter(b => String(b.supplier) === payForm.supplierId && billBalance(b) > 0)
     : [];
 
   const inputClass = "w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary";
@@ -237,6 +221,20 @@ export default function Creditors() {
   const btnPrimary = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors";
   const btnOutline = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-input text-foreground font-medium text-sm hover:bg-muted transition-colors";
   const btnSuccess = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-success text-white font-medium text-sm hover:bg-success/90 transition-colors";
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-24 text-muted-foreground">Loading creditors…</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+        <AlertTriangle className="text-destructive" size={32} />
+        <p className="text-sm text-muted-foreground max-w-md">{error}</p>
+        <button onClick={load} className={btnOutline}><RefreshCw size={16} /> Retry</button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -246,6 +244,7 @@ export default function Creditors() {
           <p className="text-sm text-muted-foreground">Manage suppliers, invoices, payments & outstanding liabilities</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button onClick={load} className={btnOutline}><RefreshCw size={18} /> Refresh</button>
           <button onClick={() => window.print()} className={btnOutline}><Printer size={18} /> Print</button>
           <button className={btnOutline}><Download size={18} /> Export</button>
         </div>
@@ -298,24 +297,27 @@ export default function Creditors() {
                   </thead>
                   <tbody>
                     {suppliers.filter(s => !searchTerm || s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.code.toLowerCase().includes(searchTerm.toLowerCase())).map(sup => {
-                      const balance = invoices.filter(i => i.supplierId === sup.id).reduce((s, i) => s + i.balance, 0);
+                      const balance = bills.filter(b => b.supplier === sup.id).reduce((s, b) => s + billBalance(b), 0);
                       return (
                         <tr key={sup.id} className="border-b border-border hover:bg-muted/50">
                           <td className="px-3 py-2 font-mono text-xs text-primary">{sup.code}</td>
                           <td className="px-3 py-2 font-medium">{sup.name}</td>
                           <td className="px-3 py-2">{sup.contact}</td>
                           <td className="px-3 py-2">{sup.phone}</td>
-                          <td className="px-3 py-2">{sup.paymentTerms} days</td>
+                          <td className="px-3 py-2">{sup.payment_terms ?? 30} days</td>
                           <td className="px-3 py-2 text-right font-medium text-destructive">${fmt(balance)}</td>
                           <td className="px-3 py-2 text-center">
                             <div className="flex gap-2 justify-center">
                               <button onClick={() => openEditSupplier(sup)} className="text-primary hover:text-primary/80"><Edit2 size={14} /></button>
-                              <button onClick={() => setViewStatement(sup.id)} className="text-muted-foreground hover:text-foreground"><Eye size={14} /></button>
+                              <button onClick={() => setViewStatement(String(sup.id))} className="text-muted-foreground hover:text-foreground"><Eye size={14} /></button>
                             </div>
                           </td>
                         </tr>
                       );
                     })}
+                    {suppliers.length === 0 && (
+                      <tr><td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">No suppliers yet.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -356,29 +358,32 @@ export default function Creditors() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredInvoices.map(inv => (
+                    {filteredBills.map(inv => (
                       <tr key={inv.id} className="border-b border-border hover:bg-muted/50">
                         <td className="px-3 py-2">{inv.date}</td>
-                        <td className="px-3 py-2 font-mono text-xs text-primary">{inv.invoiceNumber}</td>
-                        <td className="px-3 py-2">{suppliers.find(s => s.id === inv.supplierId)?.name}</td>
+                        <td className="px-3 py-2 font-mono text-xs text-primary">{inv.bill_no}</td>
+                        <td className="px-3 py-2">{inv.supplier_name || supplierName(inv.supplier)}</td>
                         <td className="px-3 py-2">{inv.description}</td>
-                        <td className="px-3 py-2 font-mono text-xs">{inv.glAccountCode}</td>
-                        <td className="px-3 py-2 text-right">${fmt(inv.amount)}</td>
-                        <td className="px-3 py-2 text-right text-success">${fmt(inv.paid)}</td>
-                        <td className="px-3 py-2 text-right font-medium text-destructive">${fmt(inv.balance)}</td>
-                        <td className="px-3 py-2">{inv.dueDate}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{inv.gl_account_code}</td>
+                        <td className="px-3 py-2 text-right">${fmt(num(inv.amount))}</td>
+                        <td className="px-3 py-2 text-right text-success">${fmt(num(inv.paid))}</td>
+                        <td className="px-3 py-2 text-right font-medium text-destructive">${fmt(billBalance(inv))}</td>
+                        <td className="px-3 py-2">{inv.due_date}</td>
                         <td className="px-3 py-2 text-center">
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${inv.status === 'Paid' ? 'bg-success/10 text-success' : inv.status === 'Partially Paid' ? 'bg-warning/10 text-warning' : inv.status === 'Cancelled' ? 'bg-muted text-muted-foreground' : 'bg-destructive/10 text-destructive'}`}>{inv.status}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${inv.status === 'Paid' ? 'bg-success/10 text-success' : inv.status === 'Partial' ? 'bg-warning/10 text-warning' : inv.status === 'Cancelled' ? 'bg-muted text-muted-foreground' : 'bg-destructive/10 text-destructive'}`}>{billStatusLabel(inv)}</span>
                         </td>
                       </tr>
                     ))}
+                    {filteredBills.length === 0 && (
+                      <tr><td colSpan={10} className="px-3 py-6 text-center text-muted-foreground">No invoices found.</td></tr>
+                    )}
                   </tbody>
                   <tfoot>
                     <tr className="bg-muted font-semibold">
                       <td colSpan={5} className="px-3 py-2">Totals</td>
-                      <td className="px-3 py-2 text-right">${fmt(filteredInvoices.reduce((s, i) => s + i.amount, 0))}</td>
-                      <td className="px-3 py-2 text-right text-success">${fmt(filteredInvoices.reduce((s, i) => s + i.paid, 0))}</td>
-                      <td className="px-3 py-2 text-right text-destructive">${fmt(filteredInvoices.reduce((s, i) => s + i.balance, 0))}</td>
+                      <td className="px-3 py-2 text-right">${fmt(filteredBills.reduce((s, i) => s + num(i.amount), 0))}</td>
+                      <td className="px-3 py-2 text-right text-success">${fmt(filteredBills.reduce((s, i) => s + num(i.paid), 0))}</td>
+                      <td className="px-3 py-2 text-right text-destructive">${fmt(filteredBills.reduce((s, i) => s + billBalance(i), 0))}</td>
                       <td colSpan={2}></td>
                     </tr>
                   </tfoot>
@@ -413,26 +418,25 @@ export default function Creditors() {
                       <th className="text-left px-3 py-2 font-medium text-muted-foreground">Invoice</th>
                       <th className="text-right px-3 py-2 font-medium text-muted-foreground">Amount</th>
                       <th className="text-left px-3 py-2 font-medium text-muted-foreground">Mode</th>
-                      <th className="text-center px-3 py-2 font-medium text-muted-foreground">Status</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {payments.filter(p => selectedSupplier === 'all' || p.supplierId === selectedSupplier).map(p => {
-                      const inv = invoices.find(i => i.id === p.invoiceId);
+                    {payments.filter(p => selectedSupplier === 'all' || String(p.supplier) === selectedSupplier).map(p => {
+                      const inv = bills.find(b => b.id === p.bill);
                       return (
                         <tr key={p.id} className="border-b border-border hover:bg-muted/50">
                           <td className="px-3 py-2">{p.date}</td>
                           <td className="px-3 py-2 font-mono text-xs text-primary">{p.reference}</td>
-                          <td className="px-3 py-2">{suppliers.find(s => s.id === p.supplierId)?.name}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{inv?.invoiceNumber}</td>
-                          <td className="px-3 py-2 text-right font-medium text-success">${fmt(p.amount)}</td>
-                          <td className="px-3 py-2">{p.paymentMode}</td>
-                          <td className="px-3 py-2 text-center">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${p.status === 'Processed' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>{p.status}</span>
-                          </td>
+                          <td className="px-3 py-2">{p.supplier_name || supplierName(p.supplier)}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{inv?.bill_no}</td>
+                          <td className="px-3 py-2 text-right font-medium text-success">${fmt(num(p.amount))}</td>
+                          <td className="px-3 py-2">{p.method}</td>
                         </tr>
                       );
                     })}
+                    {payments.length === 0 && (
+                      <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">No payments recorded.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -469,16 +473,17 @@ export default function Creditors() {
                   </thead>
                   <tbody>
                     {suppliers.map(sup => {
-                      const today = new Date('2026-03-27');
+                      const today = new Date();
                       const sb = { current: 0, d30: 0, d60: 0, d90: 0, o90: 0, total: 0 };
-                      invoices.filter(i => i.supplierId === sup.id && i.balance > 0).forEach(inv => {
-                        const days = Math.floor((today.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-                        if (days <= 0) sb.current += inv.balance;
-                        else if (days <= 30) sb.d30 += inv.balance;
-                        else if (days <= 60) sb.d60 += inv.balance;
-                        else if (days <= 90) sb.d90 += inv.balance;
-                        else sb.o90 += inv.balance;
-                        sb.total += inv.balance;
+                      bills.filter(b => b.supplier === sup.id && billBalance(b) > 0).forEach(inv => {
+                        const balance = billBalance(inv);
+                        const days = Math.floor((today.getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24));
+                        if (days <= 0) sb.current += balance;
+                        else if (days <= 30) sb.d30 += balance;
+                        else if (days <= 60) sb.d60 += balance;
+                        else if (days <= 90) sb.d90 += balance;
+                        else sb.o90 += balance;
+                        sb.total += balance;
                       });
                       if (sb.total === 0) return null;
                       return (
@@ -526,7 +531,7 @@ export default function Creditors() {
 
           {viewStatement && (
             <div className="print-area">
-              <ReportHeader reportTitle="Creditor Statement" subtitle={`${suppliers.find(s => s.id === viewStatement)?.name} | ${dateFrom} to ${dateTo}`} />
+              <ReportHeader reportTitle="Creditor Statement" subtitle={`${suppliers.find(s => String(s.id) === viewStatement)?.name} | ${dateFrom} to ${dateTo}`} />
               <Card>
                 <CardContent className="pt-4">
                   <table className="w-full text-sm">
@@ -570,15 +575,15 @@ export default function Creditors() {
               <div><label className="block text-xs font-medium text-muted-foreground mb-1">Supplier Name</label><input value={supForm.name} onChange={e => setSupForm(p => ({ ...p, name: e.target.value }))} className={inputClass} placeholder="Company name" /></div>
               <div><label className="block text-xs font-medium text-muted-foreground mb-1">Contact Person</label><input value={supForm.contact} onChange={e => setSupForm(p => ({ ...p, contact: e.target.value }))} className={inputClass} /></div>
               <div><label className="block text-xs font-medium text-muted-foreground mb-1">Phone</label><input value={supForm.phone} onChange={e => setSupForm(p => ({ ...p, phone: e.target.value }))} className={inputClass} /></div>
-              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Email</label><input type="email" value={supForm.email} onChange={e => setSupForm(p => ({ ...p, email: e.target.value }))} className={inputClass} /></div>
+              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Email</label><input value={supForm.email} onChange={e => setSupForm(p => ({ ...p, email: e.target.value }))} className={inputClass} /></div>
               <div><label className="block text-xs font-medium text-muted-foreground mb-1">Payment Terms (days)</label><input type="number" value={supForm.paymentTerms} onChange={e => setSupForm(p => ({ ...p, paymentTerms: e.target.value }))} className={inputClass} /></div>
               <div className="sm:col-span-2"><label className="block text-xs font-medium text-muted-foreground mb-1">Address</label><input value={supForm.address} onChange={e => setSupForm(p => ({ ...p, address: e.target.value }))} className={inputClass} /></div>
               <div><label className="block text-xs font-medium text-muted-foreground mb-1">Bank Details</label><input value={supForm.bankDetails} onChange={e => setSupForm(p => ({ ...p, bankDetails: e.target.value }))} className={inputClass} /></div>
               <div><label className="block text-xs font-medium text-muted-foreground mb-1">Tax Number</label><input value={supForm.taxNumber} onChange={e => setSupForm(p => ({ ...p, taxNumber: e.target.value }))} className={inputClass} /></div>
             </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => { setShowSupplierForm(false); setEditingSupplier(null); }} className={btnOutline}>Cancel</button>
-              <button onClick={handleSaveSupplier} className={btnPrimary}><Check size={16} /> Save</button>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => { setShowSupplierForm(false); setEditingSupplier(null); }} className={btnOutline} disabled={saving}>Cancel</button>
+              <button onClick={handleSaveSupplier} className={btnPrimary} disabled={saving}><Check size={16} /> {saving ? 'Saving…' : 'Save Supplier'}</button>
             </div>
           </div>
         </div>
@@ -590,27 +595,28 @@ export default function Creditors() {
           <div className="bg-card rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4">
             <h2 className="font-display text-lg font-bold text-foreground">Capture Supplier Invoice</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Supplier</label>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Supplier</label>
                 <select value={invForm.supplierId} onChange={e => setInvForm(p => ({ ...p, supplierId: e.target.value }))} className={selectClass}>
-                  <option value="">Select...</option>
+                  <option value="">Select supplier...</option>
                   {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
               <div><label className="block text-xs font-medium text-muted-foreground mb-1">Invoice Number</label><input value={invForm.invoiceNumber} onChange={e => setInvForm(p => ({ ...p, invoiceNumber: e.target.value }))} className={inputClass} /></div>
               <div><label className="block text-xs font-medium text-muted-foreground mb-1">Date</label><input type="date" value={invForm.date} onChange={e => setInvForm(p => ({ ...p, date: e.target.value }))} className={inputClass} /></div>
-              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Expense Account</label>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">GL Account</label>
                 <select value={invForm.glAccountCode} onChange={e => setInvForm(p => ({ ...p, glAccountCode: e.target.value }))} className={selectClass}>
-                  <option value="">Select GL Account...</option>
+                  <option value="">Select account...</option>
                   {expenseAccounts.map(a => <option key={a.code} value={a.code}>{a.code} - {a.name}</option>)}
                 </select>
               </div>
-              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Amount</label><input type="number" min="0" step="0.01" value={invForm.amount} onChange={e => setInvForm(p => ({ ...p, amount: e.target.value }))} className={inputClass} placeholder="0.00" /></div>
-              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Currency</label><input value={invForm.currency} onChange={e => setInvForm(p => ({ ...p, currency: e.target.value }))} className={inputClass} /></div>
+              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Amount</label><input type="number" value={invForm.amount} onChange={e => setInvForm(p => ({ ...p, amount: e.target.value }))} className={inputClass} /></div>
               <div className="sm:col-span-2"><label className="block text-xs font-medium text-muted-foreground mb-1">Description</label><input value={invForm.description} onChange={e => setInvForm(p => ({ ...p, description: e.target.value }))} className={inputClass} /></div>
             </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowInvoiceForm(false)} className={btnOutline}>Cancel</button>
-              <button onClick={handleSaveInvoice} className={btnPrimary}><Check size={16} /> Save Invoice</button>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setShowInvoiceForm(false)} className={btnOutline} disabled={saving}>Cancel</button>
+              <button onClick={handleSaveInvoice} className={btnPrimary} disabled={saving}><Check size={16} /> {saving ? 'Saving…' : 'Save Invoice'}</button>
             </div>
           </div>
         </div>
@@ -622,31 +628,34 @@ export default function Creditors() {
           <div className="bg-card rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4">
             <h2 className="font-display text-lg font-bold text-foreground">Record Supplier Payment</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Supplier</label>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Supplier</label>
                 <select value={payForm.supplierId} onChange={e => setPayForm(p => ({ ...p, supplierId: e.target.value, invoiceId: '' }))} className={selectClass}>
-                  <option value="">Select...</option>
+                  <option value="">Select supplier...</option>
                   {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
-              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Invoice</label>
-                <select value={payForm.invoiceId} onChange={e => setPayForm(p => ({ ...p, invoiceId: e.target.value }))} className={selectClass} disabled={!payForm.supplierId}>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Invoice</label>
+                <select value={payForm.invoiceId} onChange={e => setPayForm(p => ({ ...p, invoiceId: e.target.value }))} className={selectClass}>
                   <option value="">Select invoice...</option>
-                  {supplierInvoicesForPayment.map(i => <option key={i.id} value={i.id}>{i.invoiceNumber} (Bal: ${fmt(i.balance)})</option>)}
+                  {supplierInvoicesForPayment.map(i => <option key={i.id} value={i.id}>{i.bill_no} - ${fmt(billBalance(i))} due</option>)}
                 </select>
               </div>
               <div><label className="block text-xs font-medium text-muted-foreground mb-1">Date</label><input type="date" value={payForm.date} onChange={e => setPayForm(p => ({ ...p, date: e.target.value }))} className={inputClass} /></div>
-              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Amount</label><input type="number" min="0" step="0.01" value={payForm.amount} onChange={e => setPayForm(p => ({ ...p, amount: e.target.value }))} className={inputClass} placeholder="0.00" /></div>
-              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Payment Mode</label>
+              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Amount</label><input type="number" value={payForm.amount} onChange={e => setPayForm(p => ({ ...p, amount: e.target.value }))} className={inputClass} /></div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Payment Mode</label>
                 <select value={payForm.paymentMode} onChange={e => setPayForm(p => ({ ...p, paymentMode: e.target.value }))} className={selectClass}>
-                  <option value="">Select...</option>
+                  <option value="">Select mode...</option>
                   {paymentModes.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
-              <div><label className="block text-xs font-medium text-muted-foreground mb-1">Description</label><input value={payForm.description} onChange={e => setPayForm(p => ({ ...p, description: e.target.value }))} className={inputClass} /></div>
+              <div className="sm:col-span-2"><label className="block text-xs font-medium text-muted-foreground mb-1">Description</label><input value={payForm.description} onChange={e => setPayForm(p => ({ ...p, description: e.target.value }))} className={inputClass} /></div>
             </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowPaymentForm(false)} className={btnOutline}>Cancel</button>
-              <button onClick={handleSavePayment} className={btnSuccess}><Check size={16} /> Process Payment</button>
+            <div className="flex justify-end gap-2 pt-2">
+              <button onClick={() => setShowPaymentForm(false)} className={btnOutline} disabled={saving}>Cancel</button>
+              <button onClick={handleSavePayment} className={btnSuccess} disabled={saving}><Check size={16} /> {saving ? 'Saving…' : 'Save Payment'}</button>
             </div>
           </div>
         </div>

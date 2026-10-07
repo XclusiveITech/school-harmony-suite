@@ -1,177 +1,186 @@
-import React, { useState } from 'react';
-import { transactions, students, glAccounts, type Transaction } from '@/lib/dummy-data';
-import { Download, Plus, ArrowRightLeft, Printer, Edit2, Trash2, Check, X, ChevronDown } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Download, Plus, ArrowRightLeft, Printer, Check, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
-interface CashbookAccount {
-  id: string;
-  code: string;
-  name: string;
-  type: 'Bank' | 'Petty Cash' | 'Mobile Money';
-  balance: number;
-}
-
-interface PendingEntry {
-  id: string;
-  date: string;
-  cashbookAccountId: string;
-  module: 'student' | 'customer' | 'supplier' | 'gl';
-  linkedAccountId: string;
-  linkedAccountName: string;
-  trCode: 'Receipt' | 'Payment';
-  amount: number;
-  paymentMode: string;
-  description: string;
-  status: 'pending' | 'processed';
-}
-
-const defaultCashbookAccounts: CashbookAccount[] = [
-  { id: '1', code: '1000', name: 'Cash at Bank - FBC', type: 'Bank', balance: 45000 },
-  { id: '2', code: '1100', name: 'Petty Cash', type: 'Petty Cash', balance: 2500 },
-  { id: '3', code: '1150', name: 'EcoCash Mobile', type: 'Mobile Money', balance: 3200 },
-];
-
-const dummySuppliers = [
-  { id: 's1', name: 'ABC Stationery Supplies' },
-  { id: 's2', name: 'National Foods Ltd' },
-  { id: 's3', name: 'Mega Office Furniture' },
-];
-
-const dummyCustomers = [
-  { id: 'c1', name: 'PTA Committee' },
-  { id: 'c2', name: 'Sports Council' },
-  { id: 'c3', name: 'Cafeteria Vendor' },
-];
+import {
+  listCashbookEntries, createCashbookEntry, processCashbookEntry, deleteCashbookEntry,
+  listLedgerAccounts, num,
+  type CashbookEntry, type LedgerGLAccount, type CashbookType,
+} from '@/lib/ledger-api';
 
 const paymentModes = ['Cash', 'Bank Transfer', 'EcoCash', 'Cheque', 'POS/Card'];
 
 export default function Cashbook() {
-  const [cashbookAccounts, setCashbookAccounts] = useState<CashbookAccount[]>(defaultCashbookAccounts);
-  const [showAccountModal, setShowAccountModal] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<CashbookAccount | null>(null);
-  const [showProcessing, setShowProcessing] = useState(false);
+  const [entries, setEntries] = useState<CashbookEntry[]>([]);
+  const [accounts, setAccounts] = useState<LedgerGLAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [showTransfer, setShowTransfer] = useState(false);
   const [activeTab, setActiveTab] = useState<'accounts' | 'processing' | 'report'>('report');
 
-  // Processing form state
-  const [pendingEntries, setPendingEntries] = useState<PendingEntry[]>([]);
-  const [processedEntries, setProcessedEntries] = useState<PendingEntry[]>([
-    // Dummy processed entries
-    { id: 'p1', date: '2026-03-02', cashbookAccountId: '1', module: 'student', linkedAccountId: '1', linkedAccountName: 'Henry Murinda (2026HM4521)', trCode: 'Receipt', amount: 800, paymentMode: 'Bank Transfer', description: 'Tuition payment', status: 'processed' },
-    { id: 'p2', date: '2026-03-05', cashbookAccountId: '1', module: 'gl', linkedAccountId: '5000', linkedAccountName: 'Salaries Expense', trCode: 'Payment', amount: 6500, paymentMode: 'Bank Transfer', description: 'March salary payment', status: 'processed' },
-    { id: 'p3', date: '2026-03-08', cashbookAccountId: '2', module: 'gl', linkedAccountId: '5200', linkedAccountName: 'Supplies Expense', trCode: 'Payment', amount: 350, paymentMode: 'Cash', description: 'Office supplies', status: 'processed' },
-  ]);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    cashbookAccountId: '',
-    module: '' as '' | 'student' | 'customer' | 'supplier' | 'gl',
-    linkedAccountId: '',
-    trCode: '' as '' | 'Receipt' | 'Payment',
+    account: '',
+    contra_account: '',
+    type: '' as '' | CashbookType,
     amount: '',
-    paymentMode: '',
+    method: '',
     description: '',
+    counterparty: '',
+    reference: '',
   });
 
-  // Transfer state
   const [transferData, setTransferData] = useState({
     date: new Date().toISOString().split('T')[0],
-    fromAccountId: '',
-    toAccountId: '',
+    fromAccount: '',
+    toAccount: '',
     amount: '',
     description: '',
   });
 
-  // Account form state
-  const [accountForm, setAccountForm] = useState({ code: '', name: '', type: 'Bank' as CashbookAccount['type'], balance: '' });
-
-  const getLinkedAccounts = () => {
-    switch (formData.module) {
-      case 'student': return students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName} (${s.regNumber})` }));
-      case 'customer': return dummyCustomers;
-      case 'supplier': return dummySuppliers;
-      case 'gl': return glAccounts.map(a => ({ id: a.code, name: `${a.code} - ${a.name}` }));
-      default: return [];
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [cbs, accs] = await Promise.all([listCashbookEntries(), listLedgerAccounts()]);
+      setEntries(cbs);
+      setAccounts(accs);
+    } catch (e: any) {
+      setError(e?.message || 'Could not load the cashbook from the server.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSaveEntry = () => {
-    if (!formData.date || !formData.cashbookAccountId || !formData.module || !formData.linkedAccountId || !formData.trCode || !formData.amount || !formData.paymentMode) return;
-    
-    const linked = getLinkedAccounts().find(a => a.id === formData.linkedAccountId);
-    const entry: PendingEntry = {
-      id: String(Date.now()),
-      date: formData.date,
-      cashbookAccountId: formData.cashbookAccountId,
-      module: formData.module,
-      linkedAccountId: formData.linkedAccountId,
-      linkedAccountName: linked?.name || '',
-      trCode: formData.trCode as 'Receipt' | 'Payment',
-      amount: parseFloat(formData.amount),
-      paymentMode: formData.paymentMode,
-      description: formData.description,
-      status: 'pending',
-    };
-    setPendingEntries(prev => [...prev, entry]);
-    setFormData(prev => ({ ...prev, linkedAccountId: '', trCode: '', amount: '', description: '' }));
-  };
+  useEffect(() => { load(); }, []);
 
-  const handleProcessEntries = () => {
-    const toProcess = pendingEntries.map(e => ({ ...e, status: 'processed' as const }));
-    setProcessedEntries(prev => [...prev, ...toProcess]);
-    setPendingEntries([]);
-  };
+  const bankAccounts = useMemo(
+    () => accounts.filter(a => /bank|cash|petty|mobile/i.test(a.type || a.name || '')),
+    [accounts],
+  );
 
-  const handleDeletePending = (id: string) => {
-    setPendingEntries(prev => prev.filter(e => e.id !== id));
-  };
-
-  const handleTransfer = () => {
-    if (!transferData.fromAccountId || !transferData.toAccountId || !transferData.amount || transferData.fromAccountId === transferData.toAccountId) return;
-    const amount = parseFloat(transferData.amount);
-    const fromAcc = cashbookAccounts.find(a => a.id === transferData.fromAccountId);
-    const toAcc = cashbookAccounts.find(a => a.id === transferData.toAccountId);
-    if (!fromAcc || !toAcc) return;
-
-    // Create two processed entries for the transfer
-    const transferEntries: PendingEntry[] = [
-      { id: String(Date.now()) + 'a', date: transferData.date, cashbookAccountId: transferData.fromAccountId, module: 'gl', linkedAccountId: toAcc.code, linkedAccountName: `Transfer to ${toAcc.name}`, trCode: 'Payment', amount, paymentMode: 'Internal Transfer', description: transferData.description || `Transfer to ${toAcc.name}`, status: 'processed' },
-      { id: String(Date.now()) + 'b', date: transferData.date, cashbookAccountId: transferData.toAccountId, module: 'gl', linkedAccountId: fromAcc.code, linkedAccountName: `Transfer from ${fromAcc.name}`, trCode: 'Receipt', amount, paymentMode: 'Internal Transfer', description: transferData.description || `Transfer from ${fromAcc.name}`, status: 'processed' },
-    ];
-    setProcessedEntries(prev => [...prev, ...transferEntries]);
-
-    setCashbookAccounts(prev => prev.map(a => {
-      if (a.id === transferData.fromAccountId) return { ...a, balance: a.balance - amount };
-      if (a.id === transferData.toAccountId) return { ...a, balance: a.balance + amount };
-      return a;
-    }));
-
-    setTransferData({ date: new Date().toISOString().split('T')[0], fromAccountId: '', toAccountId: '', amount: '', description: '' });
-    setShowTransfer(false);
-  };
-
-  const handleSaveAccount = () => {
-    if (!accountForm.code || !accountForm.name) return;
-    if (editingAccount) {
-      setCashbookAccounts(prev => prev.map(a => a.id === editingAccount.id ? { ...a, code: accountForm.code, name: accountForm.name, type: accountForm.type, balance: parseFloat(accountForm.balance) || a.balance } : a));
-    } else {
-      setCashbookAccounts(prev => [...prev, { id: String(Date.now()), code: accountForm.code, name: accountForm.name, type: accountForm.type, balance: parseFloat(accountForm.balance) || 0 }]);
+  const accountBalances = useMemo(() => {
+    const map: Record<number, number> = {};
+    for (const a of bankAccounts) map[a.id] = 0;
+    for (const e of entries) {
+      if (e.status !== 'Processed') continue;
+      const amt = num(e.amount);
+      if (e.type === 'Receipt') map[e.account] = (map[e.account] ?? 0) + amt;
+      else if (e.type === 'Payment') map[e.account] = (map[e.account] ?? 0) - amt;
+      else if (e.type === 'Transfer') {
+        map[e.account] = (map[e.account] ?? 0) - amt;
+        if (e.contra_account) map[e.contra_account] = (map[e.contra_account] ?? 0) + amt;
+      }
     }
-    setShowAccountModal(false);
-    setEditingAccount(null);
-    setAccountForm({ code: '', name: '', type: 'Bank', balance: '' });
+    return map;
+  }, [entries, bankAccounts]);
+
+  const pendingEntries = entries.filter(e => e.status === 'Pending');
+  const processedEntries = [...entries.filter(e => e.status === 'Processed')].sort((a, b) => b.date.localeCompare(a.date));
+
+  const accountLabel = (id?: number | null) => {
+    if (!id) return '-';
+    const a = accounts.find(x => x.id === id);
+    return a ? `${a.code} - ${a.name}` : String(id);
   };
 
-  const openEditAccount = (acc: CashbookAccount) => {
-    setEditingAccount(acc);
-    setAccountForm({ code: acc.code, name: acc.name, type: acc.type, balance: String(acc.balance) });
-    setShowAccountModal(true);
+  const handleSaveEntry = async () => {
+    if (!formData.date || !formData.account || !formData.type || !formData.amount || !formData.method) {
+      toast.error('Date, account, type, amount and method are required.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await createCashbookEntry({
+        date: formData.date,
+        type: formData.type as CashbookType,
+        account: Number(formData.account),
+        contra_account: formData.contra_account ? Number(formData.contra_account) : null,
+        amount: parseFloat(formData.amount),
+        currency: 'USD',
+        method: formData.method,
+        reference: formData.reference,
+        description: formData.description,
+        status: 'Pending',
+        counterparty: formData.counterparty,
+      });
+      toast.success('Cashbook entry saved as pending');
+      setFormData(p => ({ ...p, contra_account: '', amount: '', description: '', counterparty: '', reference: '' }));
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not save the cashbook entry.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const allEntries = [...processedEntries].sort((a, b) => b.date.localeCompare(a.date));
+  const handleProcessOne = async (id: number) => {
+    try {
+      await processCashbookEntry(id);
+      toast.success('Entry processed');
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not process the entry.');
+    }
+  };
+
+  const handleProcessAll = async () => {
+    setSaving(true);
+    try {
+      for (const e of pendingEntries) await processCashbookEntry(e.id);
+      toast.success('All pending entries processed');
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not process all entries.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeletePending = async (id: number) => {
+    try {
+      await deleteCashbookEntry(id);
+      toast.success('Entry removed');
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not remove the entry.');
+    }
+  };
+
+  const handleTransfer = async () => {
+    if (!transferData.fromAccount || !transferData.toAccount || !transferData.amount || transferData.fromAccount === transferData.toAccount) {
+      toast.error('Select two different accounts and an amount.');
+      return;
+    }
+    setSaving(true);
+    try {
+      const entry = await createCashbookEntry({
+        date: transferData.date,
+        type: 'Transfer',
+        account: Number(transferData.fromAccount),
+        contra_account: Number(transferData.toAccount),
+        amount: parseFloat(transferData.amount),
+        currency: 'USD',
+        method: 'Internal Transfer',
+        description: transferData.description,
+        status: 'Pending',
+      });
+      await processCashbookEntry(entry.id);
+      toast.success('Transfer processed');
+      setTransferData({ date: new Date().toISOString().split('T')[0], fromAccount: '', toAccount: '', amount: '', description: '' });
+      setShowTransfer(false);
+      load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not complete the transfer.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const inputClass = "w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary";
   const selectClass = "w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary appearance-none";
-  const btnPrimary = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors";
+  const btnPrimary = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-60";
   const btnOutline = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-input text-foreground font-medium text-sm hover:bg-muted transition-colors";
 
   return (
@@ -183,11 +192,8 @@ export default function Cashbook() {
           <p className="text-sm text-muted-foreground">Manage cash & bank transactions</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => { setEditingAccount(null); setAccountForm({ code: '', name: '', type: 'Bank', balance: '' }); setShowAccountModal(true); }} className={btnPrimary}>
-            <Plus size={18} /> Add Cashbook Account
-          </button>
           <button onClick={() => setActiveTab('processing')} className={btnPrimary}>
-            <DollarSignIcon /> Cashbook Processing
+            <Plus size={18} /> Cashbook Processing
           </button>
           <button onClick={() => setShowTransfer(true)} className={btnOutline}>
             <ArrowRightLeft size={18} /> Account Transfer
@@ -197,6 +203,13 @@ export default function Cashbook() {
           </button>
         </div>
       </div>
+
+      {(loading || error) && (
+        <div className={`rounded-lg px-4 py-3 text-sm flex items-center justify-between ${error ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'}`}>
+          <span>{error || 'Loading cashbook…'}</span>
+          {error && <button onClick={load} className="underline font-medium">Retry</button>}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-muted p-1 rounded-lg w-fit">
@@ -210,23 +223,23 @@ export default function Cashbook() {
       {/* Cashbook Accounts Tab */}
       {activeTab === 'accounts' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {cashbookAccounts.map(acc => (
+          {bankAccounts.map(acc => (
             <Card key={acc.id} className="light-card-blue">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">{acc.code}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${acc.type === 'Bank' ? 'bg-info/10 text-info' : acc.type === 'Petty Cash' ? 'bg-warning/10 text-warning' : 'bg-success/10 text-success'}`}>{acc.type}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-info/10 text-info">{acc.type}</span>
                 </div>
                 <CardTitle className="text-base mt-1">{acc.name}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-display font-bold text-foreground">${acc.balance.toLocaleString()}</p>
-                <div className="flex gap-2 mt-3">
-                  <button onClick={() => openEditAccount(acc)} className="text-xs text-primary hover:underline flex items-center gap-1"><Edit2 size={12} /> Edit</button>
-                </div>
+                <p className="text-2xl font-display font-bold text-foreground">${(accountBalances[acc.id] ?? 0).toLocaleString()}</p>
               </CardContent>
             </Card>
           ))}
+          {!loading && bankAccounts.length === 0 && (
+            <p className="text-sm text-muted-foreground">No bank/cash GL accounts found.</p>
+          )}
         </div>
       )}
 
@@ -245,33 +258,21 @@ export default function Cashbook() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Cashbook Account</label>
-                  <select value={formData.cashbookAccountId} onChange={e => setFormData(p => ({ ...p, cashbookAccountId: e.target.value }))} className={selectClass}>
+                  <select value={formData.account} onChange={e => setFormData(p => ({ ...p, account: e.target.value }))} className={selectClass}>
                     <option value="">Select account...</option>
-                    {cashbookAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {bankAccounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Module</label>
-                  <select value={formData.module} onChange={e => setFormData(p => ({ ...p, module: e.target.value as any, linkedAccountId: '' }))} className={selectClass}>
-                    <option value="">Select module...</option>
-                    <option value="student">Student</option>
-                    <option value="customer">Customer</option>
-                    <option value="supplier">Supplier</option>
-                    <option value="gl">General Ledger (GL)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">
-                    {formData.module === 'student' ? 'Student Account' : formData.module === 'customer' ? 'Customer' : formData.module === 'supplier' ? 'Supplier' : formData.module === 'gl' ? 'GL Account' : 'Account'}
-                  </label>
-                  <select value={formData.linkedAccountId} onChange={e => setFormData(p => ({ ...p, linkedAccountId: e.target.value }))} className={selectClass} disabled={!formData.module}>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Contra / GL Account</label>
+                  <select value={formData.contra_account} onChange={e => setFormData(p => ({ ...p, contra_account: e.target.value }))} className={selectClass}>
                     <option value="">Select...</option>
-                    {getLinkedAccounts().map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-muted-foreground mb-1">Transaction Code</label>
-                  <select value={formData.trCode} onChange={e => setFormData(p => ({ ...p, trCode: e.target.value as any }))} className={selectClass}>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Transaction Type</label>
+                  <select value={formData.type} onChange={e => setFormData(p => ({ ...p, type: e.target.value as any }))} className={selectClass}>
                     <option value="">Select...</option>
                     <option value="Receipt">Receipt</option>
                     <option value="Payment">Payment</option>
@@ -283,10 +284,14 @@ export default function Cashbook() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Payment Mode</label>
-                  <select value={formData.paymentMode} onChange={e => setFormData(p => ({ ...p, paymentMode: e.target.value }))} className={selectClass}>
+                  <select value={formData.method} onChange={e => setFormData(p => ({ ...p, method: e.target.value }))} className={selectClass}>
                     <option value="">Select...</option>
                     {paymentModes.map(m => <option key={m} value={m}>{m}</option>)}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-muted-foreground mb-1">Counterparty</label>
+                  <input type="text" value={formData.counterparty} onChange={e => setFormData(p => ({ ...p, counterparty: e.target.value }))} placeholder="Student / supplier / customer" className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-muted-foreground mb-1">Description</label>
@@ -294,7 +299,7 @@ export default function Cashbook() {
                 </div>
               </div>
               <div className="mt-4">
-                <button onClick={handleSaveEntry} className={btnPrimary}>Save Entry</button>
+                <button disabled={saving} onClick={handleSaveEntry} className={btnPrimary}>Save Entry</button>
               </div>
             </CardContent>
           </Card>
@@ -305,7 +310,7 @@ export default function Cashbook() {
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg">Pending Entries ({pendingEntries.length})</CardTitle>
-                  <button onClick={handleProcessEntries} className={btnPrimary}>
+                  <button disabled={saving} onClick={handleProcessAll} className={btnPrimary}>
                     <Check size={16} /> Process All
                   </button>
                 </div>
@@ -317,7 +322,6 @@ export default function Cashbook() {
                       <tr className="border-b border-border bg-muted">
                         <th className="text-left px-3 py-2 font-medium text-muted-foreground">Date</th>
                         <th className="text-left px-3 py-2 font-medium text-muted-foreground">Account</th>
-                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">Module</th>
                         <th className="text-left px-3 py-2 font-medium text-muted-foreground">Linked To</th>
                         <th className="text-left px-3 py-2 font-medium text-muted-foreground">Type</th>
                         <th className="text-right px-3 py-2 font-medium text-muted-foreground">Amount</th>
@@ -329,15 +333,15 @@ export default function Cashbook() {
                       {pendingEntries.map(e => (
                         <tr key={e.id} className="border-b border-border hover:bg-muted/50">
                           <td className="px-3 py-2">{e.date}</td>
-                          <td className="px-3 py-2">{cashbookAccounts.find(a => a.id === e.cashbookAccountId)?.name}</td>
-                          <td className="px-3 py-2 capitalize">{e.module}</td>
-                          <td className="px-3 py-2">{e.linkedAccountName}</td>
+                          <td className="px-3 py-2">{accountLabel(e.account)}</td>
+                          <td className="px-3 py-2">{accountLabel(e.contra_account)}</td>
                           <td className="px-3 py-2">
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${e.trCode === 'Receipt' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>{e.trCode}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${e.type === 'Receipt' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>{e.type}</span>
                           </td>
-                          <td className="px-3 py-2 text-right font-mono">${e.amount.toLocaleString()}</td>
-                          <td className="px-3 py-2">{e.paymentMode}</td>
-                          <td className="px-3 py-2 text-center">
+                          <td className="px-3 py-2 text-right font-mono">${num(e.amount).toLocaleString()}</td>
+                          <td className="px-3 py-2">{e.method}</td>
+                          <td className="px-3 py-2 text-center flex gap-2 justify-center">
+                            <button onClick={() => handleProcessOne(e.id)} className="text-success hover:text-success/80"><Check size={14} /></button>
                             <button onClick={() => handleDeletePending(e.id)} className="text-destructive hover:text-destructive/80"><Trash2 size={14} /></button>
                           </td>
                         </tr>
@@ -365,71 +369,39 @@ export default function Cashbook() {
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Date</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Account</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Description</th>
-                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Module</th>
+                    <th className="text-left px-4 py-3 font-medium text-muted-foreground">Type</th>
                     <th className="text-left px-4 py-3 font-medium text-muted-foreground">Mode</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">Receipt</th>
                     <th className="text-right px-4 py-3 font-medium text-muted-foreground">Payment</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {allEntries.map(e => (
+                  {processedEntries.map(e => (
                     <tr key={e.id} className="border-b border-border hover:bg-muted/50 transition-colors">
                       <td className="px-4 py-3 text-foreground">{e.date}</td>
-                      <td className="px-4 py-3 text-foreground">{cashbookAccounts.find(a => a.id === e.cashbookAccountId)?.name || '-'}</td>
+                      <td className="px-4 py-3 text-foreground">{accountLabel(e.account)}</td>
                       <td className="px-4 py-3 text-foreground">{e.description}</td>
-                      <td className="px-4 py-3 capitalize text-muted-foreground">{e.module}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{e.paymentMode}</td>
-                      <td className="px-4 py-3 text-right text-success font-mono">{e.trCode === 'Receipt' ? `$${e.amount.toLocaleString()}` : '-'}</td>
-                      <td className="px-4 py-3 text-right text-destructive font-mono">{e.trCode === 'Payment' ? `$${e.amount.toLocaleString()}` : '-'}</td>
+                      <td className="px-4 py-3 capitalize text-muted-foreground">{e.type}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{e.method}</td>
+                      <td className="px-4 py-3 text-right text-success font-mono">{e.type === 'Receipt' ? `$${num(e.amount).toLocaleString()}` : '-'}</td>
+                      <td className="px-4 py-3 text-right text-destructive font-mono">{e.type === 'Payment' ? `$${num(e.amount).toLocaleString()}` : '-'}</td>
                     </tr>
                   ))}
+                  {!loading && processedEntries.length === 0 && (
+                    <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No processed transactions yet.</td></tr>
+                  )}
                 </tbody>
                 <tfoot>
                   <tr className="bg-muted font-semibold">
                     <td colSpan={5} className="px-4 py-3 text-foreground">Totals</td>
-                    <td className="px-4 py-3 text-right text-success font-mono">${allEntries.filter(e => e.trCode === 'Receipt').reduce((s, e) => s + e.amount, 0).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right text-destructive font-mono">${allEntries.filter(e => e.trCode === 'Payment').reduce((s, e) => s + e.amount, 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right text-success font-mono">${processedEntries.filter(e => e.type === 'Receipt').reduce((s, e) => s + num(e.amount), 0).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right text-destructive font-mono">${processedEntries.filter(e => e.type === 'Payment').reduce((s, e) => s + num(e.amount), 0).toLocaleString()}</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {/* Account Modal */}
-      {showAccountModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50">
-          <div className="bg-card rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
-            <h2 className="font-display text-lg font-bold text-foreground">{editingAccount ? 'Edit' : 'Add'} Cashbook Account</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">Account Code</label>
-                <input value={accountForm.code} onChange={e => setAccountForm(p => ({ ...p, code: e.target.value }))} className={inputClass} placeholder="e.g. 1200" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">Account Name</label>
-                <input value={accountForm.name} onChange={e => setAccountForm(p => ({ ...p, name: e.target.value }))} className={inputClass} placeholder="e.g. Cash at Bank - CABS" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">Type</label>
-                <select value={accountForm.type} onChange={e => setAccountForm(p => ({ ...p, type: e.target.value as any }))} className={selectClass}>
-                  <option value="Bank">Bank</option>
-                  <option value="Petty Cash">Petty Cash</option>
-                  <option value="Mobile Money">Mobile Money</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">Opening Balance ($)</label>
-                <input type="number" value={accountForm.balance} onChange={e => setAccountForm(p => ({ ...p, balance: e.target.value }))} className={inputClass} placeholder="0.00" />
-              </div>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => { setShowAccountModal(false); setEditingAccount(null); }} className={btnOutline}>Cancel</button>
-              <button onClick={handleSaveAccount} className={btnPrimary}>Save</button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Transfer Modal */}
@@ -444,16 +416,16 @@ export default function Cashbook() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">From Account</label>
-                <select value={transferData.fromAccountId} onChange={e => setTransferData(p => ({ ...p, fromAccountId: e.target.value }))} className={selectClass}>
+                <select value={transferData.fromAccount} onChange={e => setTransferData(p => ({ ...p, fromAccount: e.target.value }))} className={selectClass}>
                   <option value="">Select source...</option>
-                  {cashbookAccounts.map(a => <option key={a.id} value={a.id}>{a.name} (${a.balance.toLocaleString()})</option>)}
+                  {bankAccounts.map(a => <option key={a.id} value={a.id}>{a.code} - {a.name} (${(accountBalances[a.id] ?? 0).toLocaleString()})</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">To Account</label>
-                <select value={transferData.toAccountId} onChange={e => setTransferData(p => ({ ...p, toAccountId: e.target.value }))} className={selectClass}>
+                <select value={transferData.toAccount} onChange={e => setTransferData(p => ({ ...p, toAccount: e.target.value }))} className={selectClass}>
                   <option value="">Select destination...</option>
-                  {cashbookAccounts.filter(a => a.id !== transferData.fromAccountId).map(a => <option key={a.id} value={a.id}>{a.name} (${a.balance.toLocaleString()})</option>)}
+                  {bankAccounts.filter(a => String(a.id) !== transferData.fromAccount).map(a => <option key={a.id} value={a.id}>{a.code} - {a.name} (${(accountBalances[a.id] ?? 0).toLocaleString()})</option>)}
                 </select>
               </div>
               <div>
@@ -467,15 +439,11 @@ export default function Cashbook() {
             </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setShowTransfer(false)} className={btnOutline}>Cancel</button>
-              <button onClick={handleTransfer} className={btnPrimary}>Transfer</button>
+              <button disabled={saving} onClick={handleTransfer} className={btnPrimary}>Transfer</button>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-}
-
-function DollarSignIcon() {
-  return <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>;
 }
