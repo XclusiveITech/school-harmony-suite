@@ -1,13 +1,30 @@
-import React, { useState } from 'react';
-import { glAccounts } from '@/lib/dummy-data';
+import React, { useEffect, useState } from 'react';
 import { Download, Printer } from 'lucide-react';
 import ReportHeader from '@/components/ReportHeader';
 import ReportFilters from '@/components/ReportFilters';
 import { Card, CardContent } from '@/components/ui/card';
+import { listLedgerAccounts, num, type LedgerGLAccount } from '@/lib/ledger-api';
 
 export default function GeneralLedger() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [accounts, setAccounts] = useState<LedgerGLAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setAccounts(await listLedgerAccounts());
+    } catch (e: any) {
+      setError(e?.message || 'Could not load the general ledger from the server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -25,6 +42,13 @@ export default function GeneralLedger() {
           </button>
         </div>
       </div>
+
+      {(loading || error) && (
+        <div className={`rounded-lg px-4 py-3 text-sm flex items-center justify-between print:hidden ${error ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'}`}>
+          <span>{error || 'Loading general ledger…'}</span>
+          {error && <button onClick={load} className="underline font-medium">Retry</button>}
+        </div>
+      )}
 
       <Card className="light-card-blue print:hidden">
         <CardContent className="pt-4">
@@ -47,24 +71,30 @@ export default function GeneralLedger() {
               </tr>
             </thead>
             <tbody>
-              {glAccounts.map(acc => (
-                <tr key={acc.code} className="border-b border-border hover:bg-muted/50 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-foreground">{acc.code}</td>
-                  <td className="px-4 py-3 font-medium text-foreground">{acc.name}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      acc.type === 'Asset' ? 'bg-primary/10 text-primary' :
-                      acc.type === 'Liability' ? 'bg-warning/10 text-warning' :
-                      acc.type === 'Equity' ? 'bg-info/10 text-info' :
-                      acc.type === 'Revenue' ? 'bg-success/10 text-success' :
-                      'bg-destructive/10 text-destructive'
-                    }`}>{acc.type}</span>
-                  </td>
-                  <td className={`px-4 py-3 text-right font-medium ${acc.balance < 0 ? 'text-destructive' : 'text-foreground'}`}>
-                    ${Math.abs(acc.balance).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
+              {accounts.map(acc => {
+                const bal = num(acc.balance);
+                return (
+                  <tr key={acc.id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs text-foreground">{acc.code}</td>
+                    <td className="px-4 py-3 font-medium text-foreground">{acc.name}</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                        acc.type === 'Asset' ? 'bg-primary/10 text-primary' :
+                        acc.type === 'Liability' ? 'bg-warning/10 text-warning' :
+                        acc.type === 'Equity' ? 'bg-info/10 text-info' :
+                        acc.type === 'Revenue' ? 'bg-success/10 text-success' :
+                        'bg-destructive/10 text-destructive'
+                      }`}>{acc.type}</span>
+                    </td>
+                    <td className={`px-4 py-3 text-right font-medium ${bal < 0 ? 'text-destructive' : 'text-foreground'}`}>
+                      ${Math.abs(bal).toLocaleString()}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!loading && accounts.length === 0 && (
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">No GL accounts yet.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
