@@ -1,117 +1,126 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import ReportHeader from '@/components/ReportHeader';
 import ReportFilters from '@/components/ReportFilters';
-import { students } from '@/lib/dummy-data';
-import { initialStructures, structureFullTotal } from '@/lib/fees-structure-store';
+import { AlertTriangle, RefreshCw, Search, Printer, Download, Eye, Check, ExternalLink } from 'lucide-react';
 import {
-  Search, Printer, Download, Eye, Check, FileText, Clock, AlertTriangle, Plus, ExternalLink
-} from 'lucide-react';
+  listInvoices, listReceipts, num,
+  type BackendInvoice, type BackendReceipt,
+} from '@/lib/finance-api';
+import { listStudents, type BackendStudent } from '@/lib/students-api';
+import { safeList } from '@/lib/finance-api';
 
-interface StudentInvoice {
-  id: string;
-  invoiceNumber: string;
-  studentId: string;
-  date: string;
-  dueDate: string;
-  description: string;
-  amount: number;
-  paid: number;
-  balance: number;
-  term: string;
-  status: 'Outstanding' | 'Partially Paid' | 'Paid';
+interface BackendFeeItem {
+  id: number;
+  name: string;
+  gl_account_code?: string;
+  cycle?: string;
+  applies_to?: string;
+  mandatory?: boolean;
+  amount: number | string;
 }
-
-interface StudentPayment {
-  id: string;
-  studentId: string;
-  invoiceId: string;
-  receiptNumber: string;
-  date: string;
-  amount: number;
-  paymentMode: string;
+interface BackendFeeStructure {
+  id: number;
+  code: string;
+  name: string;
+  version?: number;
+  academic_year?: string;
+  level?: string;
+  status: string;
   currency: string;
-  description: string;
-  status: 'Processed';
+  items?: BackendFeeItem[];
 }
-
-
-const initialInvoices: StudentInvoice[] = [
-  { id: 'di1', invoiceNumber: 'INV-2026-001', studentId: '1', date: '2026-01-15', dueDate: '2026-02-15', description: 'Term 1 Tuition + Boarding', amount: 2000, paid: 1600, balance: 400, term: 'Term 1 2026', status: 'Partially Paid' },
-  { id: 'di2', invoiceNumber: 'INV-2026-002', studentId: '2', date: '2026-01-15', dueDate: '2026-02-15', description: 'Term 1 Tuition Fees', amount: 900, paid: 750, balance: 150, term: 'Term 1 2026', status: 'Partially Paid' },
-  { id: 'di3', invoiceNumber: 'INV-2026-003', studentId: '3', date: '2026-01-15', dueDate: '2026-02-15', description: 'Term 1 Tuition + Boarding', amount: 2000, paid: 2000, balance: 0, term: 'Term 1 2026', status: 'Paid' },
-  { id: 'di4', invoiceNumber: 'INV-2026-004', studentId: '4', date: '2026-01-15', dueDate: '2026-02-15', description: 'Term 1 Tuition Fees', amount: 900, paid: 300, balance: 600, term: 'Term 1 2026', status: 'Partially Paid' },
-  { id: 'di5', invoiceNumber: 'INV-2026-005', studentId: '5', date: '2026-01-15', dueDate: '2026-02-15', description: 'Term 1 Tuition + Boarding', amount: 2000, paid: 1750, balance: 250, term: 'Term 1 2026', status: 'Partially Paid' },
-  { id: 'di6', invoiceNumber: 'INV-2026-006', studentId: '6', date: '2026-01-15', dueDate: '2026-02-15', description: 'Term 1 Tuition Fees', amount: 900, paid: 580, balance: 320, term: 'Term 1 2026', status: 'Partially Paid' },
-];
-
-const initialPayments: StudentPayment[] = [
-  { id: 'dp1', studentId: '1', invoiceId: 'di1', receiptNumber: 'REC-001', date: '2026-02-01', amount: 800, paymentMode: 'Bank Transfer', currency: 'USD', description: 'Tuition payment', status: 'Processed' },
-  { id: 'dp2', studentId: '1', invoiceId: 'di1', receiptNumber: 'REC-002', date: '2026-02-05', amount: 800, paymentMode: 'Bank Transfer', currency: 'USD', description: 'Boarding fees payment', status: 'Processed' },
-  { id: 'dp3', studentId: '2', invoiceId: 'di2', receiptNumber: 'REC-003', date: '2026-02-10', amount: 750, paymentMode: 'EcoCash', currency: 'USD', description: 'Tuition payment', status: 'Processed' },
-  { id: 'dp4', studentId: '3', invoiceId: 'di3', receiptNumber: 'REC-005', date: '2026-01-20', amount: 2000, paymentMode: 'Bank Transfer', currency: 'USD', description: 'Full fees payment', status: 'Processed' },
-  { id: 'dp5', studentId: '4', invoiceId: 'di4', receiptNumber: 'REC-004', date: '2026-02-20', amount: 300, paymentMode: 'Cash', currency: 'USD', description: 'Partial tuition', status: 'Processed' },
-  { id: 'dp6', studentId: '5', invoiceId: 'di5', receiptNumber: 'REC-006', date: '2026-03-01', amount: 1750, paymentMode: 'Bank Transfer', currency: 'USD', description: 'Tuition & boarding', status: 'Processed' },
-  { id: 'dp7', studentId: '6', invoiceId: 'di6', receiptNumber: 'REC-007', date: '2026-02-28', amount: 580, paymentMode: 'Cash', currency: 'USD', description: 'Tuition payment', status: 'Processed' },
-];
 
 export default function Debtors() {
-  const [invoices] = useState(initialInvoices);
-  const [pmts] = useState(initialPayments);
-  const [dateFrom, setDateFrom] = useState('2026-01-01');
-  const [dateTo, setDateTo] = useState('2026-03-31');
+  const [students, setStudents] = useState<BackendStudent[]>([]);
+  const [invoices, setInvoices] = useState<BackendInvoice[]>([]);
+  const [receipts, setReceipts] = useState<BackendReceipt[]>([]);
+  const [feeStructures, setFeeStructures] = useState<BackendFeeStructure[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [dateFrom, setDateFrom] = useState('2000-01-01');
+  const [dateTo, setDateTo] = useState('2100-12-31');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('all');
   const [selectedStudent, setSelectedStudent] = useState('all');
   const [viewStatement, setViewStatement] = useState<string | null>(null);
 
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [st, inv, rec, fs] = await Promise.all([
+        listStudents(), listInvoices(), listReceipts(), safeList<BackendFeeStructure>('/api/finance/feestructure/?limit=200'),
+      ]);
+      setStudents(st);
+      setInvoices(inv);
+      setReceipts(rec);
+      setFeeStructures(fs);
+    } catch (e: any) {
+      setError(e?.message || 'Could not load debtors data from the server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const studentName = (s: BackendStudent) => `${s.first_name} ${s.last_name}`;
   const levels = [...new Set(students.map(s => s.level))].sort();
   const filteredStudents = students.filter(s => selectedLevel === 'all' || s.level === selectedLevel);
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const totalInvoiced = invoices.reduce((s, i) => s + i.amount, 0);
-  const totalPaid = invoices.reduce((s, i) => s + i.paid, 0);
-  const totalOutstanding = invoices.reduce((s, i) => s + i.balance, 0);
+  const processedInvoices = invoices.filter(i => i.status === 'Processed');
+  const processedReceipts = receipts.filter(r => r.status === 'Processed');
+
+  const totalInvoiced = processedInvoices.reduce((s, i) => s + num(i.total), 0);
+  const totalPaid = processedReceipts.reduce((s, r) => s + num(r.amount), 0);
+  const totalOutstanding = totalInvoiced - totalPaid;
   const collectionRate = totalInvoiced > 0 ? (totalPaid / totalInvoiced) * 100 : 0;
 
-  // Aging
+  const invoiceDueDate = (inv: BackendInvoice) => inv.date; // backend has no separate due_date on invoices
+  const studentOf = (studentId: number) => students.find(s => s.id === studentId);
+
+  // Aging (based on invoice date since no explicit due date field)
   const aging = useMemo(() => {
-    const today = new Date('2026-03-27');
+    const today = new Date();
     const b = { current: 0, days30: 0, days60: 0, days90: 0, over90: 0, total: 0 };
-    invoices.filter(i => i.balance > 0).forEach(inv => {
-      const days = Math.floor((today.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-      if (days <= 0) b.current += inv.balance;
-      else if (days <= 30) b.days30 += inv.balance;
-      else if (days <= 60) b.days60 += inv.balance;
-      else if (days <= 90) b.days90 += inv.balance;
-      else b.over90 += inv.balance;
-      b.total += inv.balance;
+    processedInvoices.forEach(inv => {
+      const paidForInv = 0; // receipts aren't linked to a specific invoice in this backend
+      const balance = num(inv.total);
+      if (balance <= 0) return;
+      const days = Math.floor((today.getTime() - new Date(inv.date).getTime()) / (1000 * 60 * 60 * 24));
+      if (days <= 0) b.current += balance;
+      else if (days <= 30) b.days30 += balance;
+      else if (days <= 60) b.days60 += balance;
+      else if (days <= 90) b.days90 += balance;
+      else b.over90 += balance;
+      b.total += balance;
     });
     return b;
-  }, [invoices]);
+  }, [processedInvoices]);
 
-  // Filtered invoices
-  const filteredInvoices = invoices.filter(inv => {
-    if (selectedStudent !== 'all' && inv.studentId !== selectedStudent) return false;
+  const filteredInvoices = processedInvoices.filter(inv => {
+    if (selectedStudent !== 'all' && String(inv.student) !== selectedStudent) return false;
     if (selectedLevel !== 'all') {
-      const st = students.find(s => s.id === inv.studentId);
+      const st = studentOf(inv.student);
       if (st && st.level !== selectedLevel) return false;
     }
-    if (searchTerm && !inv.description.toLowerCase().includes(searchTerm.toLowerCase()) && !inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (searchTerm && !inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
 
-  // Statement data
   const getStatementData = (studentId: string) => {
-    const stInvoices = invoices.filter(i => i.studentId === studentId);
-    const stPayments = pmts.filter(p => p.studentId === studentId);
+    const stInvoices = processedInvoices.filter(i => String(i.student) === studentId);
+    const stReceipts = processedReceipts.filter(r => String(r.student) === studentId);
     const all = [
-      ...stInvoices.map(i => ({ date: i.date, ref: i.invoiceNumber, description: i.description, debit: i.amount, credit: 0 })),
-      ...stPayments.map(p => ({ date: p.date, ref: p.receiptNumber, description: p.description, debit: 0, credit: p.amount })),
+      ...stInvoices.map(i => ({ date: i.date, ref: i.invoice_number, description: i.lines?.map(l => l.description).join(', ') || 'Invoice', debit: num(i.total), credit: 0 })),
+      ...stReceipts.map(r => ({ date: r.date, ref: r.receipt_number, description: r.description || 'Payment', debit: 0, credit: num(r.amount) })),
     ].sort((a, b) => a.date.localeCompare(b.date));
     let running = 0;
     return all.map(item => {
@@ -124,6 +133,19 @@ export default function Debtors() {
   const inputClass = "w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary";
   const btnOutline = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-input text-foreground font-medium text-sm hover:bg-muted transition-colors";
 
+  if (loading) {
+    return <div className="flex items-center justify-center py-24 text-muted-foreground">Loading debtors…</div>;
+  }
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
+        <AlertTriangle className="text-destructive" size={32} />
+        <p className="text-sm text-muted-foreground max-w-md">{error}</p>
+        <button onClick={load} className={btnOutline}><RefreshCw size={16} /> Retry</button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -132,6 +154,7 @@ export default function Debtors() {
           <p className="text-sm text-muted-foreground">Student billing, fee tracking, statements & collections</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button onClick={load} className={btnOutline}><RefreshCw size={18} /> Refresh</button>
           <button onClick={() => window.print()} className={btnOutline}><Printer size={18} /> Print</button>
           <button className={btnOutline}><Download size={18} /> Export</button>
         </div>
@@ -188,30 +211,34 @@ export default function Debtors() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredStudents.filter(s => !searchTerm || `${s.firstName} ${s.lastName} ${s.regNumber}`.toLowerCase().includes(searchTerm.toLowerCase())).map(st => {
-                      const stInvs = invoices.filter(i => i.studentId === st.id);
-                      const invoiced = stInvs.reduce((s, i) => s + i.amount, 0);
-                      const paid = stInvs.reduce((s, i) => s + i.paid, 0);
-                      const balance = stInvs.reduce((s, i) => s + i.balance, 0);
+                    {filteredStudents.filter(s => !searchTerm || `${s.first_name} ${s.last_name} ${s.student_no}`.toLowerCase().includes(searchTerm.toLowerCase())).map(st => {
+                      const stInvs = processedInvoices.filter(i => i.student === st.id);
+                      const stRecs = processedReceipts.filter(r => r.student === st.id);
+                      const invoiced = stInvs.reduce((s, i) => s + num(i.total), 0);
+                      const paid = stRecs.reduce((s, r) => s + num(r.amount), 0);
+                      const balance = invoiced - paid;
                       return (
                         <tr key={st.id} className="border-b border-border hover:bg-muted/50">
-                          <td className="px-3 py-2 font-mono text-xs text-primary">{st.regNumber}</td>
-                          <td className="px-3 py-2 font-medium">{st.firstName} {st.lastName}</td>
-                          <td className="px-3 py-2">{st.className}</td>
-                          <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${st.boardingStatus === 'Boarding' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{st.boardingStatus}</span></td>
+                          <td className="px-3 py-2 font-mono text-xs text-primary">{st.student_no}</td>
+                          <td className="px-3 py-2 font-medium">{studentName(st)}</td>
+                          <td className="px-3 py-2">{st.class_name}</td>
+                          <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${st.residence === 'Boarding' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>{st.residence}</span></td>
                           <td className="px-3 py-2 text-right">${fmt(invoiced)}</td>
                           <td className="px-3 py-2 text-right text-success">${fmt(paid)}</td>
                           <td className="px-3 py-2 text-right font-medium text-destructive">${fmt(balance)}</td>
                           <td className="px-3 py-2 text-center">
-                            {balance === 0 ? <span className="text-xs text-success flex items-center justify-center gap-1"><Check size={14} /> Paid</span>
+                            {balance <= 0 ? <span className="text-xs text-success flex items-center justify-center gap-1"><Check size={14} /> Paid</span>
                               : <span className="text-xs text-warning flex items-center justify-center gap-1"><AlertTriangle size={14} /> Owing</span>}
                           </td>
                           <td className="px-3 py-2 text-center">
-                            <button onClick={() => setViewStatement(st.id)} className="text-primary hover:text-primary/80"><Eye size={14} /></button>
+                            <button onClick={() => setViewStatement(String(st.id))} className="text-primary hover:text-primary/80"><Eye size={14} /></button>
                           </td>
                         </tr>
                       );
                     })}
+                    {students.length === 0 && (
+                      <tr><td colSpan={9} className="px-3 py-6 text-center text-muted-foreground">No students found.</td></tr>
+                    )}
                   </tbody>
                   <tfoot>
                     <tr className="bg-muted font-semibold">
@@ -232,37 +259,34 @@ export default function Debtors() {
         <TabsContent value="fees" className="space-y-4">
           <div className="flex justify-between items-center print:hidden">
             <p className="text-sm text-muted-foreground">
-              Showing approved fee structures from the Fees Structure &amp; Billing module.
+              Showing fee structures from the Fees Structure &amp; Billing module.
             </p>
-            <Link
-              to="/finance/fees-structure"
-              className={btnOutline}
-            >
+            <Link to="/finance/fees-structure" className={btnOutline}>
               <ExternalLink size={16} /> Open Fees Structure &amp; Billing
             </Link>
           </div>
           <div className="print-area space-y-4">
             <ReportHeader reportTitle="Fee Structures" subtitle="From Fees Structure & Billing Engine" />
-            {initialStructures.length === 0 && (
+            {feeStructures.length === 0 && (
               <Card><CardContent className="py-6 text-center text-sm text-muted-foreground">
                 No fee structures defined. Create them in Fees Structure &amp; Billing.
               </CardContent></Card>
             )}
-            {initialStructures.map(s => (
+            {feeStructures.map(s => (
               <Card key={s.id}>
                 <CardHeader className="pb-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <CardTitle className="text-base">{s.name}</CardTitle>
                       <p className="text-xs text-muted-foreground font-mono">
-                        {s.code} · v{s.version} · {s.academicYear}
+                        {s.code}{s.version ? ` · v${s.version}` : ''}{s.academic_year ? ` · ${s.academic_year}` : ''}
                         {s.level ? ` · ${s.level}` : ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={s.status === 'Approved' ? 'default' : 'secondary'}>{s.status}</Badge>
                       <span className="text-sm font-semibold">
-                        Total: {s.currency} ${fmt(structureFullTotal(s))}
+                        Total: {s.currency} ${fmt((s.items || []).reduce((sum, it) => sum + num(it.amount), 0))}
                       </span>
                     </div>
                   </div>
@@ -280,18 +304,18 @@ export default function Debtors() {
                       </tr>
                     </thead>
                     <tbody>
-                      {s.items.map(it => (
+                      {(s.items || []).map(it => (
                         <tr key={it.id} className="border-b border-border hover:bg-muted/50">
                           <td className="px-3 py-2 font-medium">{it.name}</td>
-                          <td className="px-3 py-2 font-mono text-xs">{it.glAccountCode}</td>
+                          <td className="px-3 py-2 font-mono text-xs">{it.gl_account_code}</td>
                           <td className="px-3 py-2">{it.cycle}</td>
-                          <td className="px-3 py-2">{it.appliesTo || 'All'}</td>
+                          <td className="px-3 py-2">{it.applies_to || 'All'}</td>
                           <td className="px-3 py-2 text-center">
                             {it.mandatory
                               ? <Check size={14} className="inline text-success" />
                               : <span className="text-xs text-muted-foreground">Optional</span>}
                           </td>
-                          <td className="px-3 py-2 text-right font-semibold">${fmt(it.amount)}</td>
+                          <td className="px-3 py-2 text-right font-semibold">${fmt(num(it.amount))}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -301,7 +325,6 @@ export default function Debtors() {
             ))}
           </div>
         </TabsContent>
-
 
         {/* AGING TAB */}
         <TabsContent value="aging" className="space-y-4">
@@ -333,22 +356,25 @@ export default function Debtors() {
                   </thead>
                   <tbody>
                     {students.map(st => {
-                      const today = new Date('2026-03-27');
+                      const today = new Date();
+                      const stInvs = processedInvoices.filter(i => i.student === st.id);
+                      if (stInvs.length === 0) return null;
                       const sb = { current: 0, d30: 0, d60: 0, d90: 0, o90: 0, total: 0 };
-                      invoices.filter(i => i.studentId === st.id && i.balance > 0).forEach(inv => {
-                        const days = Math.floor((today.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-                        if (days <= 0) sb.current += inv.balance;
-                        else if (days <= 30) sb.d30 += inv.balance;
-                        else if (days <= 60) sb.d60 += inv.balance;
-                        else if (days <= 90) sb.d90 += inv.balance;
-                        else sb.o90 += inv.balance;
-                        sb.total += inv.balance;
+                      stInvs.forEach(inv => {
+                        const balance = num(inv.total);
+                        const days = Math.floor((today.getTime() - new Date(inv.date).getTime()) / (1000 * 60 * 60 * 24));
+                        if (days <= 0) sb.current += balance;
+                        else if (days <= 30) sb.d30 += balance;
+                        else if (days <= 60) sb.d60 += balance;
+                        else if (days <= 90) sb.d90 += balance;
+                        else sb.o90 += balance;
+                        sb.total += balance;
                       });
                       if (sb.total === 0) return null;
                       return (
                         <tr key={st.id} className="border-b border-border hover:bg-muted/50">
-                          <td className="px-3 py-2 font-medium">{st.firstName} {st.lastName}</td>
-                          <td className="px-3 py-2">{st.className}</td>
+                          <td className="px-3 py-2 font-medium">{studentName(st)}</td>
+                          <td className="px-3 py-2">{st.class_name}</td>
                           <td className="px-3 py-2 text-right">{sb.current > 0 ? `$${fmt(sb.current)}` : '-'}</td>
                           <td className="px-3 py-2 text-right">{sb.d30 > 0 ? `$${fmt(sb.d30)}` : '-'}</td>
                           <td className="px-3 py-2 text-right">{sb.d60 > 0 ? `$${fmt(sb.d60)}` : '-'}</td>
@@ -390,25 +416,25 @@ export default function Debtors() {
               <label className="block text-xs font-medium text-muted-foreground mb-1">Student</label>
               <select value={viewStatement || ''} onChange={e => setViewStatement(e.target.value || null)} className={selectClass}>
                 <option value="">Select student...</option>
-                {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName} ({s.regNumber})</option>)}
+                {filteredStudents.map(s => <option key={s.id} value={s.id}>{s.first_name} {s.last_name} ({s.student_no})</option>)}
               </select>
             </div>
             <ReportFilters dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo} />
           </div>
 
           {viewStatement && (() => {
-            const st = students.find(s => s.id === viewStatement);
+            const st = students.find(s => String(s.id) === viewStatement);
             if (!st) return null;
             const lines = getStatementData(viewStatement).filter(l => l.date >= dateFrom && l.date <= dateTo);
             return (
               <div className="print-area">
-                <ReportHeader reportTitle="Student Fee Statement" subtitle={`${st.firstName} ${st.lastName} (${st.regNumber}) | ${st.className} | ${dateFrom} to ${dateTo}`} />
+                <ReportHeader reportTitle="Student Fee Statement" subtitle={`${st.first_name} ${st.last_name} (${st.student_no}) | ${st.class_name} | ${dateFrom} to ${dateTo}`} />
                 <Card>
                   <CardContent className="pt-4">
                     <div className="mb-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                      <div><span className="text-muted-foreground">Parent:</span> {st.parentName}</div>
-                      <div><span className="text-muted-foreground">Phone:</span> {st.parentPhone}</div>
-                      <div><span className="text-muted-foreground">Status:</span> {st.boardingStatus}</div>
+                      <div><span className="text-muted-foreground">Guardian:</span> {st.guardian_name}</div>
+                      <div><span className="text-muted-foreground">Phone:</span> {st.guardian_phone}</div>
+                      <div><span className="text-muted-foreground">Residence:</span> {st.residence}</div>
                       <div><span className="text-muted-foreground">Level:</span> {st.level}</div>
                     </div>
                     <table className="w-full text-sm">
