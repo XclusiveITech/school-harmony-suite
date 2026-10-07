@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { assets as initialAssets, assetAssignments, students, staff, type AssetAssignment, type Asset } from '@/lib/dummy-data';
+import type { AssetAssignment, Asset } from '@/lib/dummy-data';
+import { listAssets, listAssignments, saveAsset, saveAssignment, deleteAssignment } from '@/lib/assets-api';
+import { listStudents } from '@/lib/students-api';
+import { listStaff } from '@/lib/hr-api';
+import { toast } from 'sonner';
+
+interface PersonStudent { id: string; firstName: string; lastName: string; regNumber: string; className: string; level: string }
+interface PersonStaff { id: string; firstName: string; lastName: string; employeeId: string; department: string; role: string }
 import { Plus, Printer, Search, Edit2, Trash2, Link2, Users, GraduationCap, AlertTriangle, X, TrendingDown, Calculator, Play } from 'lucide-react';
 import ReportHeader from '@/components/ReportHeader';
 import ReportFilters from '@/components/ReportFilters';
@@ -16,8 +23,28 @@ export default function Assets() {
     const hash = location.hash.replace('#', '') as Tab;
     if (['register', 'assignments', 'depreciation', 'report'].includes(hash)) setTab(hash);
   }, [location.hash]);
-  const [assetList, setAssetList] = useState<Asset[]>(initialAssets);
-  const [assignments, setAssignments] = useState<AssetAssignment[]>(assetAssignments);
+  const [assetList, setAssetList] = useState<Asset[]>([]);
+  const [assignments, setAssignments] = useState<AssetAssignment[]>([]);
+  const [students, setStudents] = useState<PersonStudent[]>([]);
+  const [staff, setStaff] = useState<PersonStaff[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true); setLoadError(null);
+    try {
+      const [a, as, st, sf] = await Promise.all([
+        listAssets(), listAssignments(),
+        listStudents().catch(() => []), listStaff().catch(() => []),
+      ]);
+      setAssetList(a); setAssignments(as);
+      setStudents(st.map(s => ({ id: String(s.id), firstName: s.first_name, lastName: s.last_name, regNumber: s.student_no, className: s.class_name, level: s.level })));
+      setStaff(sf.map(s => ({ id: String(s.id), firstName: s.first_name, lastName: s.last_name, employeeId: s.employee_id, department: s.department, role: s.role })));
+    } catch (e: any) {
+      setLoadError(e?.message || 'Failed to load assets from the server');
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
   const [showForm, setShowForm] = useState(false);
   const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -74,32 +101,31 @@ export default function Assets() {
     setShowRegisterForm(false);
   };
 
-  const handleSave = () => {
-    const personList = form.assignedToType === 'Student' ? students : staff;
+  const handleSave = async () => {
+    const personList: any[] = form.assignedToType === 'Student' ? students : staff;
     const person = personList.find(p => p.id === form.assignedTo);
-    const name = person ? `${(person as any).firstName} ${(person as any).lastName}` : '';
-    if (editId) {
-      setAssignments(prev => prev.map(a => a.id === editId ? { ...a, ...form, assignedToName: name } : a));
-    } else {
-      setAssignments(prev => [...prev, { id: String(Date.now()), ...form, assignedToName: name }]);
-    }
-    resetForm();
+    const name = person ? `${person.firstName} ${person.lastName}` : '';
+    try {
+      const saved = await saveAssignment({ ...form, assignedToName: name }, editId || undefined);
+      setAssignments(prev => editId ? prev.map(a => a.id === editId ? saved : a) : [...prev, saved]);
+      toast.success('Assignment saved');
+      resetForm();
+    } catch (e: any) { toast.error(e?.message || 'Failed to save assignment'); }
   };
 
-  const handleRegisterSave = () => {
+  const handleRegisterSave = async () => {
     const serials = regForm.serialNumbers.split(',').map(s => s.trim()).filter(Boolean);
-    const newAsset: Asset = {
-      id: editAssetId || String(Date.now()),
+    const data = {
       name: regForm.name, category: regForm.category, purchaseDate: regForm.purchaseDate,
       cost: Number(regForm.cost), depreciationRate: Number(regForm.depreciationRate),
-      currentValue: Number(regForm.currentValue), location: regForm.location, serialNumbers: serials,
+      currentValue: Number(regForm.currentValue || regForm.cost), location: regForm.location, serialNumbers: serials,
     };
-    if (editAssetId) {
-      setAssetList(prev => prev.map(a => a.id === editAssetId ? newAsset : a));
-    } else {
-      setAssetList(prev => [...prev, newAsset]);
-    }
-    resetRegForm();
+    try {
+      const saved = await saveAsset(data, editAssetId || undefined);
+      setAssetList(prev => editAssetId ? prev.map(a => a.id === editAssetId ? saved : a) : [...prev, saved]);
+      toast.success('Asset saved');
+      resetRegForm();
+    } catch (e: any) { toast.error(e?.message || 'Failed to save asset'); }
   };
 
   const handleEditAsset = (a: Asset) => {
@@ -120,7 +146,13 @@ export default function Assets() {
     setTab('assignments');
   };
 
-  const handleDelete = (id: string) => setAssignments(prev => prev.filter(a => a.id !== id));
+  const handleDelete = async (id: string) => {
+    if (!confirm('Remove this assignment?')) return;
+    try {
+      await deleteAssignment(id);
+      setAssignments(prev => prev.filter(a => a.id !== id));
+    } catch (e: any) { toast.error(e?.message || 'Failed to delete'); }
+  };
 
   const studentAssignCount = assignments.filter(a => a.assignedToType === 'Student').length;
   const staffAssignCount = assignments.filter(a => a.assignedToType === 'Staff').length;
