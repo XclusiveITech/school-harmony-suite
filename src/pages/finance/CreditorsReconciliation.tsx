@@ -1,158 +1,167 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ReportHeader from '@/components/ReportHeader';
 import ReportFilters from '@/components/ReportFilters';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { CheckCircle2, AlertTriangle, Search, Printer, Download, Link2, Unlink, Eye, ArrowRightLeft, FileText, Users, Clock } from 'lucide-react';
-
-interface Supplier {
-  id: string;
-  code: string;
-  name: string;
-  contact: string;
-  phone: string;
-  email: string;
-  balance: number;
-}
-
-interface SupplierInvoice {
-  id: string;
-  supplierId: string;
-  date: string;
-  invoiceNumber: string;
-  description: string;
-  amount: number;
-  paid: number;
-  balance: number;
-  dueDate: string;
-  status: 'Outstanding' | 'Partially Paid' | 'Paid';
-  matched: boolean;
-  matchedWith?: string;
-}
-
-interface PaymentRecord {
-  id: string;
-  supplierId: string;
-  date: string;
-  reference: string;
-  description: string;
-  amount: number;
-  paymentMode: string;
-  matched: boolean;
-  matchedWith?: string;
-}
+import { toast } from 'sonner';
+import { CheckCircle2, AlertTriangle, Search, Printer, Download, Link2, Unlink, ArrowRightLeft, FileText } from 'lucide-react';
+import {
+  listSuppliers, listSupplierBills, listSupplierPayments,
+  listSupplierStatementLines, matchSupplierStatementLine, billBalance, num,
+  type BackendSupplier, type BackendSupplierBill, type BackendSupplierPayment,
+  type BackendSupplierStatementLine,
+} from '@/lib/payables-api';
 
 interface AgingBucket {
-  current: number;
-  days30: number;
-  days60: number;
-  days90: number;
-  over90: number;
-  total: number;
+  current: number; days30: number; days60: number; days90: number; over90: number; total: number;
 }
 
-// Dummy data
-const suppliers: Supplier[] = [
-  { id: 's1', code: 'SUP001', name: 'ABC Stationery Supplies', contact: 'John Smith', phone: '+263771112233', email: 'abc@supplies.com', balance: 4500 },
-  { id: 's2', code: 'SUP002', name: 'National Foods Ltd', contact: 'Mary Jones', phone: '+263772223344', email: 'orders@natfoods.co.zw', balance: 8200 },
-  { id: 's3', code: 'SUP003', name: 'Mega Office Furniture', contact: 'Peter Brown', phone: '+263773334455', email: 'sales@megaoffice.co.zw', balance: 3500 },
-  { id: 's4', code: 'SUP004', name: 'ZESA Holdings', contact: 'Billing Dept', phone: '+263774445566', email: 'billing@zesa.co.zw', balance: 1500 },
-  { id: 's5', code: 'SUP005', name: 'NetOne Telecoms', contact: 'Corporate', phone: '+263775556677', email: 'corporate@netone.co.zw', balance: 650 },
-];
+const MATCH_WINDOW_DAYS = 3;
 
-const supplierInvoices: SupplierInvoice[] = [
-  { id: 'si1', supplierId: 's1', date: '2026-02-15', invoiceNumber: 'ABC-1045', description: 'Exercise books & pens', amount: 2500, paid: 1500, balance: 1000, dueDate: '2026-03-15', status: 'Partially Paid', matched: false },
-  { id: 'si2', supplierId: 's1', date: '2026-03-01', invoiceNumber: 'ABC-1078', description: 'Chalk & markers', amount: 3500, paid: 0, balance: 3500, dueDate: '2026-03-31', status: 'Outstanding', matched: false },
-  { id: 'si3', supplierId: 's2', date: '2026-01-20', invoiceNumber: 'NF-8821', description: 'Catering supplies - Jan', amount: 4200, paid: 4200, balance: 0, dueDate: '2026-02-20', status: 'Paid', matched: true, matchedWith: 'cp3' },
-  { id: 'si4', supplierId: 's2', date: '2026-02-20', invoiceNumber: 'NF-8890', description: 'Catering supplies - Feb', amount: 4800, paid: 2000, balance: 2800, dueDate: '2026-03-20', status: 'Partially Paid', matched: false },
-  { id: 'si5', supplierId: 's2', date: '2026-03-20', invoiceNumber: 'NF-8945', description: 'Catering supplies - Mar', amount: 5400, paid: 0, balance: 5400, dueDate: '2026-04-20', status: 'Outstanding', matched: false },
-  { id: 'si6', supplierId: 's3', date: '2026-03-10', invoiceNumber: 'MOF-456', description: 'Classroom desks & chairs', amount: 3500, paid: 0, balance: 3500, dueDate: '2026-04-10', status: 'Outstanding', matched: false },
-  { id: 'si7', supplierId: 's4', date: '2026-03-01', invoiceNumber: 'ZESA-0326', description: 'Electricity - March', amount: 1500, paid: 0, balance: 1500, dueDate: '2026-03-31', status: 'Outstanding', matched: false },
-  { id: 'si8', supplierId: 's5', date: '2026-03-05', invoiceNumber: 'N1-7890', description: 'Internet & phone - March', amount: 650, paid: 0, balance: 650, dueDate: '2026-03-31', status: 'Outstanding', matched: false },
-];
-
-const creditorPayments: PaymentRecord[] = [
-  { id: 'cp1', supplierId: 's1', date: '2026-03-05', reference: 'PAY-S001', description: 'Payment ABC Stationery - partial', amount: 1500, paymentMode: 'Bank Transfer', matched: true, matchedWith: 'si1' },
-  { id: 'cp2', supplierId: 's2', date: '2026-02-28', reference: 'PAY-S002', description: 'Payment National Foods - partial', amount: 2000, paymentMode: 'Bank Transfer', matched: false },
-  { id: 'cp3', supplierId: 's2', date: '2026-02-10', reference: 'PAY-S003', description: 'Payment National Foods - Jan inv', amount: 4200, paymentMode: 'Bank Transfer', matched: true, matchedWith: 'si3' },
-];
+function daysApart(a: string, b: string): number {
+  return Math.abs(Math.floor((new Date(a).getTime() - new Date(b).getTime()) / (1000 * 60 * 60 * 24)));
+}
 
 export default function CreditorsReconciliation() {
-  const [dateFrom, setDateFrom] = useState('2026-03-01');
-  const [dateTo, setDateTo] = useState('2026-03-31');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [showOnlyUnmatched, setShowOnlyUnmatched] = useState(false);
-  const [invoices, setInvoices] = useState(supplierInvoices);
-  const [payments, setPayments] = useState(creditorPayments);
-  const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null);
-  const [selectedPayment, setSelectedPayment] = useState<string | null>(null);
 
-  const filteredInvoices = invoices.filter(inv => {
-    if (selectedSupplier !== 'all' && inv.supplierId !== selectedSupplier) return false;
-    if (showOnlyUnmatched && inv.matched) return false;
-    if (searchTerm && !inv.description.toLowerCase().includes(searchTerm.toLowerCase()) && !inv.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
+  const [suppliers, setSuppliers] = useState<BackendSupplier[]>([]);
+  const [bills, setBills] = useState<BackendSupplierBill[]>([]);
+  const [payments, setPayments] = useState<BackendSupplierPayment[]>([]);
+  const [statementLines, setStatementLines] = useState<BackendSupplierStatementLine[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [matching, setMatching] = useState(false);
 
-  const filteredPayments = payments.filter(p => {
-    if (selectedSupplier !== 'all' && p.supplierId !== selectedSupplier) return false;
-    if (showOnlyUnmatched && p.matched) return false;
-    if (searchTerm && !p.description.toLowerCase().includes(searchTerm.toLowerCase()) && !p.reference.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
+  const [selectedBill, setSelectedBill] = useState<number | null>(null);
+  const [selectedLine, setSelectedLine] = useState<number | null>(null);
 
-  const totalOutstanding = suppliers.reduce((s, sup) => s + sup.balance, 0);
-
-  // Aging calculation
-  const aging = useMemo((): AgingBucket => {
-    const today = new Date('2026-03-27');
-    const bucket: AgingBucket = { current: 0, days30: 0, days60: 0, days90: 0, over90: 0, total: 0 };
-    invoices.filter(i => i.balance > 0).forEach(inv => {
-      const due = new Date(inv.dueDate);
-      const days = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
-      if (days <= 0) bucket.current += inv.balance;
-      else if (days <= 30) bucket.days30 += inv.balance;
-      else if (days <= 60) bucket.days60 += inv.balance;
-      else if (days <= 90) bucket.days90 += inv.balance;
-      else bucket.over90 += inv.balance;
-      bucket.total += inv.balance;
-    });
-    return bucket;
-  }, [invoices]);
-
-  const handleAutoMatch = () => {
-    const newInv = [...invoices];
-    const newPay = [...payments];
-    for (let pi = 0; pi < newPay.length; pi++) {
-      if (newPay[pi].matched) continue;
-      for (let ii = 0; ii < newInv.length; ii++) {
-        if (newInv[ii].matched || newInv[ii].supplierId !== newPay[pi].supplierId) continue;
-        if (Math.abs(newPay[pi].amount - newInv[ii].paid) < 0.01 || Math.abs(newPay[pi].amount - newInv[ii].amount) < 0.01) {
-          newInv[ii] = { ...newInv[ii], matched: true, matchedWith: newPay[pi].id };
-          newPay[pi] = { ...newPay[pi], matched: true, matchedWith: newInv[ii].id };
-          break;
-        }
-      }
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [sup, b, p, sl] = await Promise.all([
+        listSuppliers(), listSupplierBills(), listSupplierPayments(), listSupplierStatementLines(),
+      ]);
+      setSuppliers(sup);
+      setBills(b);
+      setPayments(p);
+      setStatementLines(sl);
+    } catch (e: any) {
+      setError(e?.message || 'Could not load creditors reconciliation data from the server.');
+    } finally {
+      setLoading(false);
     }
-    setInvoices(newInv);
-    setPayments(newPay);
   };
 
-  const handleManualMatch = () => {
-    if (!selectedInvoice || !selectedPayment) return;
-    setInvoices(prev => prev.map(i => i.id === selectedInvoice ? { ...i, matched: true, matchedWith: selectedPayment } : i));
-    setPayments(prev => prev.map(p => p.id === selectedPayment ? { ...p, matched: true, matchedWith: selectedInvoice } : p));
-    setSelectedInvoice(null);
-    setSelectedPayment(null);
+  useEffect(() => { load(); }, []);
+
+  const supplierName = (id: number) => suppliers.find(s => s.id === id)?.name || `Supplier #${id}`;
+
+  const filteredBills = bills.filter(b => {
+    if (selectedSupplier !== 'all' && String(b.supplier) !== selectedSupplier) return false;
+    if (dateFrom && b.date < dateFrom) return false;
+    if (dateTo && b.date > dateTo) return false;
+    if (searchTerm && !b.description?.toLowerCase().includes(searchTerm.toLowerCase()) && !b.bill_no.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    return true;
+  });
+
+  const filteredLines = statementLines.filter(l => {
+    if (selectedSupplier !== 'all' && String(l.supplier) !== selectedSupplier) return false;
+    if (showOnlyUnmatched && l.matched) return false;
+    if (dateFrom && l.date < dateFrom) return false;
+    if (dateTo && l.date > dateTo) return false;
+    if (searchTerm && !(l.description || '').toLowerCase().includes(searchTerm.toLowerCase()) && !(l.reference || '').toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    return true;
+  });
+
+  const totalOutstanding = useMemo(() => bills.reduce((s, b) => s + billBalance(b), 0), [bills]);
+
+  const aging = useMemo((): AgingBucket => {
+    const today = new Date();
+    const bucket: AgingBucket = { current: 0, days30: 0, days60: 0, days90: 0, over90: 0, total: 0 };
+    bills.filter(b => billBalance(b) > 0).forEach(b => {
+      const due = new Date(b.due_date);
+      const days = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+      const bal = billBalance(b);
+      if (days <= 0) bucket.current += bal;
+      else if (days <= 30) bucket.days30 += bal;
+      else if (days <= 60) bucket.days60 += bal;
+      else if (days <= 90) bucket.days90 += bal;
+      else bucket.over90 += bal;
+      bucket.total += bal;
+    });
+    return bucket;
+  }, [bills]);
+
+  const handleAutoMatch = async () => {
+    setMatching(true);
+    try {
+      const billsById = new Map(bills.map(b => [b.id, b]));
+      const usedBills = new Set<number>(statementLines.filter(l => l.matched_bill).map(l => l.matched_bill as number));
+      let count = 0;
+      for (const line of statementLines) {
+        if (line.matched) continue;
+        const match = bills.find(b =>
+          !usedBills.has(b.id) &&
+          b.supplier === line.supplier &&
+          Math.abs(num(b.amount) - num(line.amount)) < 0.01 &&
+          daysApart(b.date, line.date) <= MATCH_WINDOW_DAYS,
+        );
+        if (match) {
+          usedBills.add(match.id);
+          await matchSupplierStatementLine(line.id, match.id);
+          count += 1;
+        }
+      }
+      if (count > 0) toast.success(`Auto-matched ${count} statement line${count === 1 ? '' : 's'}`);
+      else toast.message('No new matches found');
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not auto-match statement lines.');
+    } finally {
+      setMatching(false);
+    }
+  };
+
+  const handleManualMatch = async () => {
+    if (!selectedBill || !selectedLine) return;
+    setMatching(true);
+    try {
+      await matchSupplierStatementLine(selectedLine, selectedBill);
+      toast.success('Statement line matched to bill');
+      setSelectedBill(null);
+      setSelectedLine(null);
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not match the selected items.');
+    } finally {
+      setMatching(false);
+    }
+  };
+
+  const handleUnmatch = async (lineId: number) => {
+    setMatching(true);
+    try {
+      await matchSupplierStatementLine(lineId, null);
+      toast.success('Statement line unmatched');
+      await load();
+    } catch (e: any) {
+      toast.error(e?.message || 'Could not unmatch the statement line.');
+    } finally {
+      setMatching(false);
+    }
   };
 
   const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const selectClass = "px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary";
   const inputClass = "w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary";
-  const btnPrimary = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground font-medium text-sm hover:bg-primary/90 transition-colors";
-  const btnSuccess = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-success text-white font-medium text-sm hover:bg-success/90 transition-colors";
-  const btnWarning = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-warning text-white font-medium text-sm hover:bg-warning/90 transition-colors";
+  const btnSuccess = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-success text-white font-medium text-sm hover:bg-success/90 transition-colors disabled:opacity-60";
+  const btnWarning = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-warning text-white font-medium text-sm hover:bg-warning/90 transition-colors disabled:opacity-60";
   const btnOutline = "inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-input text-foreground font-medium text-sm hover:bg-muted transition-colors";
 
   return (
@@ -160,13 +169,20 @@ export default function CreditorsReconciliation() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-bold text-foreground">Creditors Reconciliation</h1>
-          <p className="text-sm text-muted-foreground">Reconcile supplier invoices with payments made</p>
+          <p className="text-sm text-muted-foreground">Reconcile supplier statement lines with bills</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button onClick={() => window.print()} className={btnOutline}><Printer size={18} /> Print</button>
           <button className={btnOutline}><Download size={18} /> Export</button>
         </div>
       </div>
+
+      {(loading || error) && (
+        <div className={`rounded-lg px-4 py-3 text-sm flex items-center justify-between ${error ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'}`}>
+          <span>{error || 'Loading creditors reconciliation…'}</span>
+          {error && <button onClick={load} className="underline font-medium">Retry</button>}
+        </div>
+      )}
 
       <Tabs defaultValue="reconcile">
         <TabsList>
@@ -187,9 +203,9 @@ export default function CreditorsReconciliation() {
                   </select>
                 </div>
                 <ReportFilters dateFrom={dateFrom} dateTo={dateTo} onDateFromChange={setDateFrom} onDateToChange={setDateTo} />
-                <button onClick={handleAutoMatch} className={btnSuccess}><Link2 size={16} /> Auto-Match</button>
-                {selectedInvoice && selectedPayment && (
-                  <button onClick={handleManualMatch} className={btnWarning}><ArrowRightLeft size={16} /> Match Selected</button>
+                <button disabled={matching} onClick={handleAutoMatch} className={btnSuccess}><Link2 size={16} /> Auto-Match</button>
+                {selectedBill && selectedLine && (
+                  <button disabled={matching} onClick={handleManualMatch} className={btnWarning}><ArrowRightLeft size={16} /> Match Selected</button>
                 )}
               </div>
             </CardContent>
@@ -199,15 +215,15 @@ export default function CreditorsReconciliation() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <Card className="light-card-blue"><CardContent className="pt-4 pb-3"><p className="text-xs text-muted-foreground">Total Suppliers</p><p className="text-lg font-bold font-display">{suppliers.length}</p></CardContent></Card>
             <Card className="light-card-red"><CardContent className="pt-4 pb-3"><p className="text-xs text-muted-foreground">Total Outstanding</p><p className="text-lg font-bold font-display">${fmt(totalOutstanding)}</p></CardContent></Card>
-            <Card className="light-card-orange"><CardContent className="pt-4 pb-3"><p className="text-xs text-muted-foreground">Unmatched Invoices</p><p className="text-lg font-bold font-display">{invoices.filter(i => !i.matched && i.balance > 0).length}</p></CardContent></Card>
-            <Card className="light-card-green"><CardContent className="pt-4 pb-3"><p className="text-xs text-muted-foreground">Fully Matched</p><p className="text-lg font-bold font-display">{invoices.filter(i => i.matched).length}</p></CardContent></Card>
+            <Card className="light-card-orange"><CardContent className="pt-4 pb-3"><p className="text-xs text-muted-foreground">Unmatched Lines</p><p className="text-lg font-bold font-display">{statementLines.filter(l => !l.matched).length}</p></CardContent></Card>
+            <Card className="light-card-green"><CardContent className="pt-4 pb-3"><p className="text-xs text-muted-foreground">Fully Matched</p><p className="text-lg font-bold font-display">{statementLines.filter(l => l.matched).length}</p></CardContent></Card>
           </div>
 
           {/* Search */}
           <div className="flex gap-3 items-center flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search invoices & payments..." className={`${inputClass} pl-9`} />
+              <input type="text" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Search bills & statement lines..." className={`${inputClass} pl-9`} />
             </div>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input type="checkbox" checked={showOnlyUnmatched} onChange={e => setShowOnlyUnmatched(e.target.checked)} className="rounded" />
@@ -218,14 +234,14 @@ export default function CreditorsReconciliation() {
           {/* Side by Side */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><FileText size={18} className="text-destructive" /> Supplier Invoices</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><FileText size={18} className="text-destructive" /> Supplier Bills</CardTitle></CardHeader>
               <CardContent>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                   <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-muted">
                       <tr className="border-b border-border">
                         <th className="text-left px-2 py-2 font-medium text-muted-foreground">Date</th>
-                        <th className="text-left px-2 py-2 font-medium text-muted-foreground">Invoice #</th>
+                        <th className="text-left px-2 py-2 font-medium text-muted-foreground">Bill #</th>
                         <th className="text-left px-2 py-2 font-medium text-muted-foreground">Supplier</th>
                         <th className="text-right px-2 py-2 font-medium text-muted-foreground">Amount</th>
                         <th className="text-right px-2 py-2 font-medium text-muted-foreground">Balance</th>
@@ -233,19 +249,22 @@ export default function CreditorsReconciliation() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredInvoices.map(inv => (
-                        <tr key={inv.id} onClick={() => !inv.matched && setSelectedInvoice(inv.id === selectedInvoice ? null : inv.id)}
-                          className={`border-b border-border cursor-pointer transition-colors ${inv.matched ? 'bg-success/5' : selectedInvoice === inv.id ? 'bg-primary/10 ring-1 ring-primary' : 'hover:bg-muted/50'}`}>
-                          <td className="px-2 py-2">{inv.date}</td>
-                          <td className="px-2 py-2 font-mono text-xs">{inv.invoiceNumber}</td>
-                          <td className="px-2 py-2">{suppliers.find(s => s.id === inv.supplierId)?.name}</td>
-                          <td className="px-2 py-2 text-right">${fmt(inv.amount)}</td>
-                          <td className="px-2 py-2 text-right font-medium">${fmt(inv.balance)}</td>
+                      {filteredBills.map(b => (
+                        <tr key={b.id} onClick={() => setSelectedBill(b.id === selectedBill ? null : b.id)}
+                          className={`border-b border-border cursor-pointer transition-colors ${selectedBill === b.id ? 'bg-primary/10 ring-1 ring-primary' : 'hover:bg-muted/50'}`}>
+                          <td className="px-2 py-2">{b.date}</td>
+                          <td className="px-2 py-2 font-mono text-xs">{b.bill_no}</td>
+                          <td className="px-2 py-2">{b.supplier_name || supplierName(b.supplier)}</td>
+                          <td className="px-2 py-2 text-right">${fmt(num(b.amount))}</td>
+                          <td className="px-2 py-2 text-right font-medium">${fmt(billBalance(b))}</td>
                           <td className="px-2 py-2 text-center">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${inv.status === 'Paid' ? 'bg-success/10 text-success' : inv.status === 'Partially Paid' ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive'}`}>{inv.status}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${b.status === 'Paid' ? 'bg-success/10 text-success' : b.status === 'Partial' ? 'bg-warning/10 text-warning' : 'bg-destructive/10 text-destructive'}`}>{b.status}</span>
                           </td>
                         </tr>
                       ))}
+                      {!loading && filteredBills.length === 0 && (
+                        <tr><td colSpan={6} className="px-2 py-6 text-center text-muted-foreground">No supplier bills yet.</td></tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -253,7 +272,7 @@ export default function CreditorsReconciliation() {
             </Card>
 
             <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><FileText size={18} className="text-success" /> Payments Made</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className="text-base flex items-center gap-2"><FileText size={18} className="text-success" /> Supplier Statement Lines</CardTitle></CardHeader>
               <CardContent>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                   <table className="w-full text-sm">
@@ -263,25 +282,30 @@ export default function CreditorsReconciliation() {
                         <th className="text-left px-2 py-2 font-medium text-muted-foreground">Reference</th>
                         <th className="text-left px-2 py-2 font-medium text-muted-foreground">Supplier</th>
                         <th className="text-right px-2 py-2 font-medium text-muted-foreground">Amount</th>
-                        <th className="text-left px-2 py-2 font-medium text-muted-foreground">Mode</th>
                         <th className="text-center px-2 py-2 font-medium text-muted-foreground">Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredPayments.map(p => (
-                        <tr key={p.id} onClick={() => !p.matched && setSelectedPayment(p.id === selectedPayment ? null : p.id)}
-                          className={`border-b border-border cursor-pointer transition-colors ${p.matched ? 'bg-success/5' : selectedPayment === p.id ? 'bg-primary/10 ring-1 ring-primary' : 'hover:bg-muted/50'}`}>
-                          <td className="px-2 py-2">{p.date}</td>
-                          <td className="px-2 py-2 font-mono text-xs">{p.reference}</td>
-                          <td className="px-2 py-2">{suppliers.find(s => s.id === p.supplierId)?.name}</td>
-                          <td className="px-2 py-2 text-right">${fmt(p.amount)}</td>
-                          <td className="px-2 py-2">{p.paymentMode}</td>
+                      {filteredLines.map(l => (
+                        <tr key={l.id} onClick={() => !l.matched && setSelectedLine(l.id === selectedLine ? null : l.id)}
+                          className={`border-b border-border cursor-pointer transition-colors ${l.matched ? 'bg-success/5' : selectedLine === l.id ? 'bg-primary/10 ring-1 ring-primary' : 'hover:bg-muted/50'}`}>
+                          <td className="px-2 py-2">{l.date}</td>
+                          <td className="px-2 py-2 font-mono text-xs">{l.reference}</td>
+                          <td className="px-2 py-2">{supplierName(l.supplier)}</td>
+                          <td className="px-2 py-2 text-right">${fmt(num(l.amount))}</td>
                           <td className="px-2 py-2 text-center">
-                            {p.matched ? <span className="text-xs text-success flex items-center justify-center gap-1"><CheckCircle2 size={14} /> Matched</span>
-                              : <span className="text-xs text-warning flex items-center justify-center gap-1"><AlertTriangle size={14} /> Unmatched</span>}
+                            {l.matched ? (
+                              <span className="inline-flex items-center gap-1 text-xs text-success">
+                                <CheckCircle2 size={14} /> Matched
+                                <button onClick={(ev) => { ev.stopPropagation(); handleUnmatch(l.id); }} className="ml-1 text-destructive hover:text-destructive/80"><Unlink size={12} /></button>
+                              </span>
+                            ) : <span className="text-xs text-warning flex items-center justify-center gap-1"><AlertTriangle size={14} /> Unmatched</span>}
                           </td>
                         </tr>
                       ))}
+                      {!loading && filteredLines.length === 0 && (
+                        <tr><td colSpan={5} className="px-2 py-6 text-center text-muted-foreground">No supplier statement lines yet.</td></tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -293,10 +317,9 @@ export default function CreditorsReconciliation() {
         {/* AGING TAB */}
         <TabsContent value="aging" className="space-y-4">
           <div className="print-area">
-            <ReportHeader reportTitle="Creditors Aging Report" subtitle={`As at ${dateTo}`} />
+            <ReportHeader reportTitle="Creditors Aging Report" subtitle={`As at ${dateTo || new Date().toISOString().slice(0, 10)}`} />
             <Card>
               <CardContent className="pt-6">
-                {/* Aging summary */}
                 <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
                   {[
                     { label: 'Current', value: aging.current, color: 'light-card-green' },
@@ -310,7 +333,6 @@ export default function CreditorsReconciliation() {
                   ))}
                 </div>
 
-                {/* Per-supplier aging */}
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted">
@@ -325,17 +347,18 @@ export default function CreditorsReconciliation() {
                   </thead>
                   <tbody>
                     {suppliers.map(sup => {
-                      const supInvs = invoices.filter(i => i.supplierId === sup.id && i.balance > 0);
-                      const today = new Date('2026-03-27');
+                      const supBills = bills.filter(b => b.supplier === sup.id && billBalance(b) > 0);
+                      const today = new Date();
                       const b = { current: 0, d30: 0, d60: 0, d90: 0, over: 0, total: 0 };
-                      supInvs.forEach(inv => {
-                        const days = Math.floor((today.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-                        if (days <= 0) b.current += inv.balance;
-                        else if (days <= 30) b.d30 += inv.balance;
-                        else if (days <= 60) b.d60 += inv.balance;
-                        else if (days <= 90) b.d90 += inv.balance;
-                        else b.over += inv.balance;
-                        b.total += inv.balance;
+                      supBills.forEach(bill => {
+                        const days = Math.floor((today.getTime() - new Date(bill.due_date).getTime()) / (1000 * 60 * 60 * 24));
+                        const bal = billBalance(bill);
+                        if (days <= 0) b.current += bal;
+                        else if (days <= 30) b.d30 += bal;
+                        else if (days <= 60) b.d60 += bal;
+                        else if (days <= 90) b.d90 += bal;
+                        else b.over += bal;
+                        b.total += bal;
                       });
                       if (b.total === 0) return null;
                       return (
@@ -371,7 +394,7 @@ export default function CreditorsReconciliation() {
         {/* STATEMENT TAB */}
         <TabsContent value="statement" className="space-y-4">
           <div className="print-area">
-            <ReportHeader reportTitle="Creditor Statement" subtitle={selectedSupplier !== 'all' ? suppliers.find(s => s.id === selectedSupplier)?.name : 'All Suppliers'} />
+            <ReportHeader reportTitle="Creditor Statement" subtitle={selectedSupplier !== 'all' ? suppliers.find(s => String(s.id) === selectedSupplier)?.name : 'All Suppliers'} />
             <Card>
               <CardContent className="pt-4">
                 <div className="mb-4">
@@ -395,11 +418,11 @@ export default function CreditorsReconciliation() {
                     {(() => {
                       const sId = selectedSupplier;
                       const allItems: { date: string; ref: string; desc: string; charge: number; payment: number }[] = [];
-                      invoices.filter(i => sId === 'all' || i.supplierId === sId).forEach(i => {
-                        allItems.push({ date: i.date, ref: i.invoiceNumber, desc: i.description, charge: i.amount, payment: 0 });
+                      bills.filter(b => sId === 'all' || String(b.supplier) === sId).forEach(b => {
+                        allItems.push({ date: b.date, ref: b.bill_no, desc: b.description, charge: num(b.amount), payment: 0 });
                       });
-                      payments.filter(p => sId === 'all' || p.supplierId === sId).forEach(p => {
-                        allItems.push({ date: p.date, ref: p.reference, desc: p.description, charge: 0, payment: p.amount });
+                      payments.filter(p => sId === 'all' || String(p.supplier) === sId).forEach(p => {
+                        allItems.push({ date: p.date, ref: p.reference || '', desc: p.description || '', charge: 0, payment: num(p.amount) });
                       });
                       allItems.sort((a, b) => a.date.localeCompare(b.date));
                       let running = 0;
