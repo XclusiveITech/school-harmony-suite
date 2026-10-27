@@ -9,6 +9,8 @@ import { BranchProvider } from "@/contexts/BranchContext";
 import { SchoolSettingsProvider } from "@/contexts/SchoolSettingsContext";
 import AppLayout from "@/components/layout/AppLayout";
 import Login from "@/pages/Login";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
 import Students from "@/pages/Students";
 import Attendance from "@/pages/Attendance";
@@ -81,6 +83,8 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Navigate to="/login" replace />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route element={<AppLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/students" element={<Students />} />
