@@ -128,3 +128,26 @@ urlpatterns = [
 ] + router.urls
 ```
 Also make your token view refuse sign-in when `user.is_locked` is true.
+
+## Student portal forgot password
+Frontend: `/portal/forgot-password` posts `{ student_no, reset_url }`; the email link opens `/portal/reset-password?uid=..&token=..`, which reuses `password-reset/confirm/`.
+
+```python
+from students.models import Student
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def student_password_reset(request):
+    student = Student.objects.filter(student_no__iexact=(request.data.get('student_no') or '').strip()).first()
+    user = getattr(student, 'user', None)  # OneToOne to the login account
+    to = (user and user.email) or (student and student.guardian_email)
+    if student and user and to:
+        uid = urlsafe_base64_encode(force_bytes(user.pk))
+        token = default_token_generator.make_token(user)
+        link = f"{settings.FRONTEND_URL}/portal/reset-password?uid={uid}&token={token}"
+        send_mail('Reset your Brainstar student portal password',
+                  f'Reset the portal password for {student.first_name} ({student.student_no}):\n{link}\n\nValid for 1 hour.',
+                  None, [to])
+    return Response({'detail': 'If the student exists, a reset link was sent.'})
+```
+Add `path('student-password-reset/', v.student_password_reset),` to the auth urls.

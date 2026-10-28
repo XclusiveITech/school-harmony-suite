@@ -102,6 +102,9 @@ export default function StudentPortalLogin() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              <div className="mt-2 text-right">
+                <Link to="/portal/forgot-password" className="text-sm text-primary hover:underline">Forgot password?</Link>
+              </div>
             </div>
             <button type="submit" className="w-full py-2.5 rounded-lg bg-gradient-to-r from-[hsl(142_71%_45%)] to-[hsl(199_89%_48%)] text-white font-semibold hover:opacity-90 transition-opacity">
               Sign In

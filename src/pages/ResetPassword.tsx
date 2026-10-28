@@ -4,7 +4,7 @@ import { CheckCircle2, ArrowLeft } from 'lucide-react';
 import { confirmPasswordReset, passwordProblem } from '@/lib/auth-api';
 import { AuthShell, authInput, authButton } from './ForgotPassword';
 
-export default function ResetPassword() {
+export default function ResetPassword({ portal = false }: { portal?: boolean }) {
   const [params] = useSearchParams();
   const uid = params.get('uid') || '';
   const token = params.get('token') || '';
@@ -47,7 +47,7 @@ export default function ResetPassword() {
           </form>
         </>
       )}
-      <Link to={done ? '/login' : '/forgot-password'} className="mt-6 flex items-center justify-center gap-2 text-sm text-blue-200 hover:text-white">
+      <Link to={done ? (portal ? '/portal/login' : '/login') : (portal ? '/portal/forgot-password' : '/forgot-password')} className="mt-6 flex items-center justify-center gap-2 text-sm text-blue-200 hover:text-white">
         <ArrowLeft size={16} /> {done ? 'Go to sign in' : 'Request a new link'}
       </Link>
     </AuthShell>
