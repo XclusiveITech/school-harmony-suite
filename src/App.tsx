@@ -11,6 +11,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import Login from "@/pages/Login";
 import ForgotPassword from "@/pages/ForgotPassword";
 import ResetPassword from "@/pages/ResetPassword";
+import PortalForgotPassword from "@/pages/portal/PortalForgotPassword";
 import Dashboard from "@/pages/Dashboard";
 import Students from "@/pages/Students";
 import Attendance from "@/pages/Attendance";
@@ -141,6 +142,8 @@ const App = () => (
               </Route>
               {/* Student Portal */}
               <Route path="/portal/login" element={<StudentPortalLogin />} />
+              <Route path="/portal/forgot-password" element={<PortalForgotPassword />} />
+              <Route path="/portal/reset-password" element={<ResetPassword portal />} />
               <Route element={<StudentPortalLayout />}>
                 <Route path="/portal/dashboard" element={<PortalDashboard />} />
                 <Route path="/portal/fees" element={<PortalFees />} />

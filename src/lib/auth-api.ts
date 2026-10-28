@@ -62,3 +62,9 @@ export function passwordProblem(p: string): string | null {
   if (!/[A-Za-z]/.test(p) || !/\d/.test(p)) return 'Use both letters and numbers.';
   return null;
 }
+
+/** Student portal: look up by registration number; link goes to the student's / guardian's email on file. */
+export const requestStudentPasswordReset = (student_no: string) =>
+  publicPost('/api/auth/student-password-reset/', {
+    student_no, reset_url: `${window.location.origin}/portal/reset-password`,
+  });
