@@ -78,7 +78,7 @@ export async function refreshAccessToken(): Promise<string | null> {
 export async function apiFetch<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   const call = async (accessToken: string | null) => {
     const headers = new Headers(init.headers || {});
-    if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
+    if (!headers.has('Content-Type') && init.body && !(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
     if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
     return fetch(`${API_URL}${path}`, { ...init, headers });
   };
