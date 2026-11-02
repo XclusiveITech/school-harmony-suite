@@ -1,10 +1,11 @@
 import React from 'react';
 import { Outlet, Navigate, NavLink, useNavigate } from 'react-router-dom';
-import { students, type Student } from '@/lib/dummy-data';
+import { type Student } from '@/lib/dummy-data';
+import { tokens } from '@/lib/api';
 import { useSchoolSettings } from '@/contexts/SchoolSettingsContext';
 import {
   LayoutDashboard, Receipt, BookOpen, GraduationCap, ClipboardList,
-  Award, Bell, LogOut, ChevronLeft, ChevronRight, Menu, X, Settings, Video, UtensilsCrossed
+  Award, Bell, LogOut, ChevronLeft, ChevronRight, Menu, X, Settings, Video, UtensilsCrossed, Shirt
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -20,6 +21,7 @@ const navItems = [
   { to: '/portal/academics', icon: BookOpen, label: 'Academics' },
   { to: '/portal/online-classes', icon: Video, label: 'Online Classes' },
   { to: '/portal/canteen', icon: UtensilsCrossed, label: 'Canteen' },
+  { to: '/portal/uniforms', icon: Shirt, label: 'Uniforms' },
   { to: '/portal/assessment', icon: ClipboardList, label: 'Continuous Assessment' },
   { to: '/portal/exams', icon: GraduationCap, label: 'Examinations' },
   { to: '/portal/results', icon: Award, label: 'Results' },
@@ -38,6 +40,7 @@ export default function StudentPortalLayout() {
 
   const handleLogout = () => {
     localStorage.removeItem('brainstar_student');
+    tokens.clear();
     navigate('/portal/login');
   };
 

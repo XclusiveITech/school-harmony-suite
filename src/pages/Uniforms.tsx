@@ -5,7 +5,7 @@ import { useBranch } from '@/contexts/BranchContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
+import VariantDialog from '@/components/uniforms/VariantDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +29,7 @@ export default function Uniforms({ portal = false }: { portal?: boolean }) {
   const [kind, setKind] = useState<'Starter' | 'Extra'>('Extra'); const [cart, setCart] = useState<CartLine[]>([]);
   const [selectedVariants, setSelectedVariants] = useState<Record<number, string>>({});
   const [edit, setEdit] = useState<UniformProduct | null | undefined>(undefined); const [image, setImage] = useState<File | null>(null);
+  const [variantEdit, setVariantState] = useState<{ product: number; variant?: number } | null>(null);
   const [orderId, setOrderId] = useState<number | null>(null); const [reference, setReference] = useState('');
   const [amount, setAmount] = useState(''); const [method, setMethod] = useState(''); const [collectionRef, setCollectionRef] = useState('');
   const load = useCallback(async () => {
@@ -57,6 +58,7 @@ export default function Uniforms({ portal = false }: { portal?: boolean }) {
   const add = (p: UniformProduct) => {
     const variant = Number(selectedVariants[p.id]); if (!variant) return toast.error('Choose a size and colour.');
     const quantity = kind === 'Starter' ? requirements.find(r => r.product === p.id)?.remaining ?? STARTER_QUANTITY : 1;
+    if (kind === 'Starter' && !requirements.some(r => r.product === p.id)) return toast.error('This uniform is not part of this student’s starter set.');
     if (quantity <= 0) return toast.error('This starter item has already been purchased.');
     const next = [...cart.filter(l => l.variant !== variant), { variant, quantity: (cart.find(l => l.variant === variant)?.quantity || 0) + quantity }];
     const issue = validateCart(next, data.products); if (issue) return toast.error(issue); setCart(next);

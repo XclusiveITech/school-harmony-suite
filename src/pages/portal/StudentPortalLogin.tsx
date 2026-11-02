@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { GraduationCap, Eye, EyeOff, ArrowLeft } from 'lucide-react';
-import { students } from '@/lib/dummy-data';
+import { api, loginRequest, tokens } from '@/lib/api';
+import type { Student } from '@/lib/dummy-data';
 
 export default function StudentPortalLogin() {
   const navigate = useNavigate();
@@ -9,20 +10,25 @@ export default function StudentPortalLogin() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const stored = localStorage.getItem('brainstar_student');
   if (stored) return <Navigate to="/portal/dashboard" replace />;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const student = students.find(s => s.regNumber === regNumber);
-    if (student && password === 'student123') {
+    setBusy(true);
+    try {
+      const response = await loginRequest(regNumber.trim(), password);
+      tokens.set(response.access, response.refresh);
+      const student = await api.get<Student>('/api/uniforms/portal/session/');
       localStorage.setItem('brainstar_student', JSON.stringify(student));
       navigate('/portal/dashboard');
-    } else {
-      setError('Invalid registration number or password');
-    }
+    } catch (e) {
+      tokens.clear();
+      setError(e instanceof Error ? e.message : 'Unable to sign in.');
+    } finally { setBusy(false); }
   };
 
   return (
@@ -106,19 +112,11 @@ export default function StudentPortalLogin() {
                 <Link to="/portal/forgot-password" className="text-sm text-primary hover:underline">Forgot password?</Link>
               </div>
             </div>
-            <button type="submit" className="w-full py-2.5 rounded-lg bg-gradient-to-r from-[hsl(142_71%_45%)] to-[hsl(199_89%_48%)] text-white font-semibold hover:opacity-90 transition-opacity">
-              Sign In
+            <button type="submit" disabled={busy} className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity disabled:opacity-50">
+              {busy ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
 
-          <div className="mt-8 p-4 rounded-lg bg-muted">
-            <p className="text-xs font-semibold text-muted-foreground mb-2">Demo Credentials:</p>
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <p><span className="font-medium text-foreground">Henry Murinda:</span> 2026HM4521 / student123</p>
-              <p><span className="font-medium text-foreground">Tatenda Dube:</span> 2025TD9023 / student123</p>
-              <p><span className="font-medium text-foreground">Kudzai Moyo:</span> 2026KM1456 / student123</p>
-            </div>
-          </div>
         </div>
       </div>
     </div>
