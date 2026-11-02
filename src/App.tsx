@@ -36,6 +36,7 @@ import LeaveManagement from "@/pages/hr/LeaveManagement";
 import Assets from "@/pages/Assets";
 import Inventory from "@/pages/Inventory";
 import Tuckshop from "@/pages/Tuckshop";
+import Uniforms from "@/pages/Uniforms";
 import Requisitions from "@/pages/Requisitions";
 import OnlineClasses from "@/pages/OnlineClasses";
 import Transport from "@/pages/Transport";
@@ -128,6 +129,7 @@ const App = () => (
                 <Route path="/assets" element={<Assets />} />
                 <Route path="/inventory" element={<Inventory />} />
                 <Route path="/tuckshop" element={<Tuckshop />} />
+                <Route path="/uniforms" element={<Uniforms />} />
                 <Route path="/requisitions" element={<Requisitions />} />
                 <Route path="/online-classes" element={<OnlineClasses />} />
                 <Route path="/transport" element={<Transport />} />
@@ -155,6 +157,7 @@ const App = () => (
                 <Route path="/portal/profile" element={<PortalProfile />} />
                 <Route path="/portal/online-classes" element={<PortalOnlineClasses />} />
                 <Route path="/portal/canteen" element={<PortalCanteen />} />
+                <Route path="/portal/uniforms" element={<Uniforms portal />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
